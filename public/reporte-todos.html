@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Resumen por Empleado</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
+</head>
+<body>
+  <div class="contenedor">
+    <img src="logo-dinex.png" alt="Logo DinEX" class="logo">
+    <h1>Resumen por Empleado</h1>
+
+    <div style="text-align:center; margin: 20px 0;">
+      <label>Desde: <input type="date" id="fechaInicio"></label>
+      <label>Hasta: <input type="date" id="fechaFin"></label>
+      <button class="boton" onclick="filtrarPorFecha()">Buscar por Fechas</button>
+    </div>
+
+    <!-- NUEVO: Filtro por departamento -->
+    <div style="text-align:center; margin: 10px 0;">
+      <label>Departamento:
+        <select id="departamento" onchange="filtrarPorDepartamento()">
+          <option value="todos">Todos</option>
+        </select>
+      </label>
+    </div>
+
+    <div class="botones">
+      <button onclick="cargarResumen()" class="boton">Ver Todo</button>
+      <button onclick="exportarResumenExcel()" class="boton">Exportar a Excel</button>
+      <button onclick="exportarResumenPDF()" class="boton">Exportar a PDF</button>
+      <button onclick="window.print()" class="boton">Imprimir</button> <!-- NUEVO -->
+    </div>
+
+    <div id="resumen" style="margin-top:20px;"></div>
+    <br>
+    <a href="admin.html" class="boton">Volver al Panel</a>
+  </div>
+
+  <script>
+    let datosTodos = [];
+    let resumenFinal = [];
+    let mapaNombres = {};
+
+    async function cargarResumen() {
+      try {
+        const [usuariosRes, datosRes] = await Promise.all([
+          fetch('/api/usuarios'),
+          fetch('/api/reporte-todos')
+        ]);
+        if (!usuariosRes.ok || !datosRes.ok) throw new Error('Error cargando datos');
+        mapaNombres = await usuariosRes.json();
+        datosTodos = await datosRes.json();
+        llenarSelectDepartamentos(); // NUEVO
+        renderResumen(datosTodos);
+      } catch (err) {
+        alert('Error cargando información del servidor.');
+        console.error(err);
+      }
+    }
+
+    function llenarSelectDepartamentos() {
+      const selectDepto = document.getElementById("departamento");
+      const departamentos = [...new Set(datosTodos.map(r => r.departamento || ''))];
+      selectDepto.innerHTML = '<option value="todos">Todos</option>';
+      departamentos.forEach(d => {
+        if (d.trim()) {
+          const option = document.createElement("option");
+          option.value = d;
+          option.textContent = d;
+          selectDepto.appendChild(option);
+        }
+      });
+    }
+
+    function filtrarPorDepartamento() {
+      const depto = document.getElementById("departamento").value;
+      if (depto === "todos") {
+        renderResumen(datosTodos);
+      } else {
+        const filtrados = datosTodos.filter(r => (r.departamento || '').toLowerCase() === depto.toLowerCase());
+        renderResumen(filtrados);
+      }
+    }
+
+    function formatFecha(f) {
+      if (f.includes('-')) {
+        const [y,m,d] = f.split('-');
+        return `${m}/${d}/${y}`;
+      }
+      return f;
+    }
+
+    function filtrarPorFecha() {
+      const desde = document.getElementById("fechaInicio").value;
+      const hasta = document.getElementById("fechaFin").value;
+      if (!desde || !hasta) {
+        alert("Debes seleccionar ambas fechas.");
+        return;
+      }
+      const filtrados = datosTodos.filter(r => r.fecha >= desde && r.fecha <= hasta);
+      renderResumen(filtrados);
+    }
+
+    function renderResumen(data) {
+      const resumen = {};
+      resumenFinal = [];
+
+      data.forEach(r => {
+        const nombre = mapaNombres[r.usuario] || r.usuario;
+        if (!resumen[nombre]) {
+          resumen[nombre] = {
+            departamento: r.departamento || '',
+            dias: new Set(),
+            totalMs: 0
+          };
+        }
+        resumen[nombre].dias.add(r.fecha);
+      });
+
+      const agrupado = {};
+      data.forEach(r => {
+        const nombre = mapaNombres[r.usuario] || r.usuario;
+        if (!agrupado[nombre]) agrupado[nombre] = {};
+        if (!agrupado[nombre][r.fecha]) agrupado[nombre][r.fecha] = [];
+        agrupado[nombre][r.fecha].push(r);
+      });
+
+      Object.entries(agrupado).forEach(([nombre, fechas]) => {
+        Object.values(fechas).forEach(regs => {
+          const entradas = regs.filter(x => x.tipo === 'entrada').sort((a,b) => a.hora.localeCompare(b.hora));
+          const salidas = regs.filter(x => x.tipo === 'salida').sort((a,b) => a.hora.localeCompare(b.hora));
+          if (entradas.length && salidas.length) {
+            const ini = new Date(`${regs[0].fecha}T${entradas[0].hora}`);
+            const fin = new Date(`${regs[0].fecha}T${salidas[salidas.length - 1].hora}`);
+            resumen[nombre].totalMs += fin - ini;
+          }
+        });
+      });
+
+      let html = '<h2 style="text-align:center">Resumen por Empleado</h2>';
+      html += '<table border="1" style="margin:auto;border-collapse:collapse;">'
+           +  '<tr><th>Nombre Completo</th><th>Departamento</th><th>Días Trabajados</th><th>Total de Horas</th></tr>';
+      Object.entries(resumen).forEach(([nombre, info]) => {
+        const horas = (info.totalMs / 3600000).toFixed(2);
+        resumenFinal.push({
+          "Nombre Completo": nombre,
+          "Departamento": info.departamento,
+          "Días Trabajados": info.dias.size,
+          "Total de Horas": horas
+        });
+        html += `<tr>
+          <td>${nombre}</td>
+          <td>${info.departamento}</td>
+          <td>${info.dias.size}</td>
+          <td>${horas}</td>
+        </tr>`;
+      });
+      html += '</table>';
+      document.getElementById('resumen').innerHTML = html;
+    }
+
+    function exportarResumenExcel() {
+      if (!resumenFinal.length) {
+        alert("No hay datos para exportar.");
+        return;
+      }
+      const ws = XLSX.utils.json_to_sheet(resumenFinal);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Resumen');
+      XLSX.writeFile(wb, 'resumen-empleados.xlsx');
+    }
+
+    function exportarResumenPDF() {
+      if (!resumenFinal.length) {
+        alert("No hay datos para exportar.");
+        return;
+      }
+
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF();
+      const img = new Image();
+      img.src = 'logo-dinex.png';
+      img.onload = () => {
+        doc.addImage(img, 'PNG', 14, 8, 50, 15);
+        doc.setFontSize(14);
+        doc.text('Resumen por Empleado', 70, 20);
+
+        const cols = ['Nombre Completo', 'Departamento', 'Días Trabajados', 'Total de Horas'];
+        const filas = resumenFinal.map(r => [
+          r["Nombre Completo"],
+          r["Departamento"],
+          r["Días Trabajados"],
+          r["Total de Horas"]
+        ]);
+
+        doc.autoTable({
+          startY: 30,
+          head: [cols],
+          body: filas,
+          styles: { fontSize: 9 }
+        });
+
+        doc.save('resumen-empleados.pdf');
+      };
+    }
+  </script>
+
+  <style>
+  .boton.danger {
+    background: #ea1902;
+  }
+
+  table {
+    width: 90%;
+    margin: 20px auto;
+    border-collapse: collapse;
+    font-size: 14px;
+    text-align: center;
+    box-shadow: 0 0 5px rgba(0,0,0,0.1);
+  }
+
+  th {
+    background-color: #0a75c2;
+    color: white;
+    padding: 10px;
+    font-weight: bold;
+  }
+
+  td {
+    padding: 8px;
+  }
+
+  tr:nth-child(even) {
+    background-color: #f8f8f8;
+  }
+
+  tr:hover {
+    background-color: #eef6ff;
+  }
+
+  h1 {
+    text-align: center;
+    margin-bottom: 10px;
+  }
+
+  .botones {
+    text-align: center;
+    margin: 20px 0;
+  }
+
+  .boton {
+    background-color: #ec008c;
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    margin: 5px;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: background 0.3s ease;
+  }
+
+  .boton:hover {
+    background-color: #c60074;
+  }
+
+  label {
+    margin: 0 10px;
+  }
+
+  .contenedor {
+    max-width: 1100px;
+    margin: auto;
+    padding: 20px;
+  }
+
+  .logo {
+    display: block;
+    margin: 0 auto 10px auto;
+    max-width: 220px;
+  }
+  </style>
+</body>
+</html>

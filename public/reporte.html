@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Reporte de Horas</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
+  <style>
+    .boton {
+      background-color: #ec008c;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      margin: 5px;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 14px;
+    }
+    .boton:hover {
+      background-color: #c60074;
+    }
+    .tabla-reporte {
+      width: 90%;
+      margin: 30px auto;
+      border-collapse: collapse;
+      font-size: 15px;
+      text-align: center;
+      box-shadow: 0 0 6px rgba(0, 0, 0, 0.1);
+    }
+    .tabla-reporte th {
+      background-color: #ec008c;
+      color: white;
+      padding: 10px;
+      font-weight: bold;
+    }
+    .tabla-reporte td {
+      padding: 8px;
+      border-bottom: 1px solid #ddd;
+    }
+    .tabla-reporte tr:nth-child(even) {
+      background-color: #fdf4fb;
+    }
+    .tabla-reporte tr:hover {
+      background-color: #fae6f4;
+    }
+    .contenedor {
+      max-width: 1100px;
+      margin: auto;
+      padding: 20px;
+    }
+    .logo {
+      display: block;
+      margin: 0 auto 10px auto;
+      max-width: 220px;
+    }
+    h1 {
+      text-align: center;
+      margin-bottom: 20px;
+      color: #88a800;
+    }
+    input[type="text"] {
+      padding: 6px 10px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      font-size: 14px;
+      margin-right: 10px;
+    }
+    #mensaje-reporte {
+      text-align: center;
+      font-weight: bold;
+      color: red;
+      margin-top: 10px;
+    }
+  </style>
+</head>
+<body>
+  <div class="contenedor">
+    <img src="logo-dinex.png" alt="Logo DinEX" class="logo">
+    <h1>Reporte de Horas por Empleado</h1>
+    <input type="text" id="usuario" placeholder="Usuario" required>
+    <button onclick="cargarReporte()" class="boton">Ver Reporte</button>
+    <button onclick="exportarExcel()" class="boton">Exportar a Excel</button>
+    <button onclick="exportarPDF()" class="boton">Exportar a PDF</button>
+    
+    <p id="mensaje-reporte"></p> <!-- MENSAJE DE ERROR -->
+
+    <div id="resultado" style="margin-top: 20px;"></div>
+    <br>
+    <a href="admin.html" class="boton">Volver al Panel</a>
+  </div>
+
+  <script>
+    let datosGlobal = [];
+    let totalHorasStr = '';
+
+    async function cargarReporte() {
+      const usuario = document.getElementById("usuario").value.trim();
+      const mensaje = document.getElementById("mensaje-reporte");
+      const cont = document.getElementById("resultado");
+
+      mensaje.textContent = "";
+      cont.innerHTML = "";
+
+      if (!usuario) {
+        mensaje.textContent = "⚠️ Ingresa un usuario válido.";
+        return;
+      }
+
+      const res = await fetch("/api/reporte?usuario=" + encodeURIComponent(usuario));
+      const raw = await res.json();
+
+      if (!raw.length) {
+        mensaje.textContent = "❌ Este empleado ha sido eliminado o no existe.";
+        return;
+      }
+
+      const data = raw.sort((a, b) => {
+        if (a.fecha !== b.fecha) return a.fecha.localeCompare(b.fecha);
+        return a.hora.localeCompare(b.hora);
+      });
+
+      datosGlobal = data;
+
+      let tabla = `
+        <table class="tabla-reporte">
+          <tr>
+            <th>Acción</th>
+            <th>Fecha</th>
+            <th>Hora</th>
+            <th>Departamento</th>
+            <th>IP</th>
+          </tr>
+      `;
+
+      data.forEach(r => {
+  const [yy, mm, dd] = r.fecha.split("-");
+  const esAutomatica = r.tipo === "salida" && r.auto === true;
+  const tipoTexto = esAutomatica ? "salida (automática)" : r.tipo;
+
+  tabla += `
+    <tr>
+      <td>${tipoTexto}</td>
+      <td>${mm}/${dd}/${yy}</td>
+      <td>${r.hora}</td>
+      <td>${r.departamento || ''}</td>
+      <td>${r.ip || ''}</td>
+    </tr>
+  `;
+});
+
+      tabla += `</table><br>`;
+
+      // Calcular total de horas
+      const porDia = data.reduce((acc, r) => {
+        acc[r.fecha] = acc[r.fecha] || [];
+        acc[r.fecha].push(r);
+        return acc;
+      }, {});
+      let totalMs = 0;
+      Object.entries(porDia).forEach(([fecha, regs]) => {
+        const entradas = regs.filter(x => x.tipo === 'entrada').sort((a,b) => a.hora.localeCompare(b.hora));
+        const salidas  = regs.filter(x => x.tipo === 'salida').sort((a,b) => a.hora.localeCompare(b.hora));
+        if (entradas.length && salidas.length) {
+          const inicio = new Date(`${fecha}T${entradas[0].hora}`);
+          const fin    = new Date(`${fecha}T${salidas[salidas.length-1].hora}`);
+          totalMs += fin - inicio;
+        }
+      });
+      const horas   = Math.floor(totalMs / 3600000);
+      const minutos = Math.floor((totalMs % 3600000) / 60000);
+      totalHorasStr = `${horas}h ${minutos}m`;
+      tabla += `<p style="text-align:center; font-weight:bold;">Total de horas trabajadas: ${totalHorasStr}</p>`;
+
+      cont.innerHTML = tabla;
+    }
+
+    function exportarExcel() {
+      if (!datosGlobal.length) {
+        alert("Primero debe cargar un reporte.");
+        return;
+      }
+      const rows = datosGlobal.map(d => {
+  const [y, m, d2] = d.fecha.split('-');
+  const tipoTexto = d.tipo === "salida" && d.auto === true ? "salida (automática)" : d.tipo;
+  return {
+    Acción       : tipoTexto,
+    Fecha        : `${m}/${d2}/${y}`,
+    Hora         : d.hora,
+    Departamento : d.departamento || '',
+    IP           : d.ip || ''
+  };
+});
+      rows.push({});
+      rows.push({ Acción: 'Total horas', Hora: totalHorasStr });
+
+      const ws = XLSX.utils.json_to_sheet(rows, {skipHeader:false});
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Reporte");
+      ws['!cols'] = [{wpx:100},{wpx:80},{wpx:80},{wpx:100},{wpx:120}];
+      XLSX.writeFile(wb, "reporte-usuario.xlsx");
+    }
+
+    async function exportarPDF() {
+      if (!datosGlobal.length) {
+        alert("Primero debe cargar un reporte.");
+        return;
+      }
+      const usuario = document.getElementById("usuario").value.trim();
+
+      const usuariosRes = await fetch("/api/usuarios");
+      const mapaNombres = await usuariosRes.json();
+      const nombreCompleto = mapaNombres[usuario] || usuario;
+
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF();
+      const img = new Image();
+      img.src = 'logo-dinex.png';
+
+      img.onload = () => {
+        doc.addImage(img, 'PNG', 14, 8, 50, 15);
+        doc.setFontSize(12);
+        doc.setTextColor(100);
+        doc.text(`Empleado: ${nombreCompleto}`, 70, 20);
+        doc.setFontSize(14);
+        doc.setTextColor(0);
+        doc.text("Reporte de Horas por Empleado", 70, 28);
+
+        const cols = ["Acción", "Fecha", "Hora", "Departamento", "IP"];
+        const filas = datosGlobal.map(d => {
+  const [y, m, d2] = d.fecha.split('-');
+  const tipoTexto = d.tipo === "salida" && d.auto === true ? "salida (automática)" : d.tipo;
+  return [tipoTexto, `${m}/${d2}/${y}`, d.hora, d.departamento || '', d.ip || ''];
+});
+        filas.push(['','','','','']);
+        filas.push(['Total horas','', totalHorasStr,'','']);
+
+        doc.autoTable({
+          startY: 35,
+          head: [cols],
+          body: filas,
+          styles: { fontSize: 10 },
+          headStyles: { fillColor: [236, 0, 140] }
+        });
+
+        doc.save("reporte-usuario.pdf");
+      };
+    }
+  </script>
+</body>
+</html>

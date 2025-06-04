@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Panel de Administración</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background-color: white;
+      margin: 0;
+      padding: 0;
+    }
+
+    .contenedor {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 20px;
+      text-align: center;
+    }
+
+    .logo {
+      max-width: 200px;
+      margin: 10px auto 20px;
+      display: block;
+    }
+
+    h1 {
+      color: #84a900;
+      margin-bottom: 20px;
+    }
+
+    .menu {
+      display: flex;
+      justify-content: center;
+      flex-wrap: wrap;
+      gap: 5px;
+    }
+
+    .submenu {
+      position: relative;
+      display: inline-block;
+    }
+
+    .boton {
+      background: #ec008c;
+      color: white;
+      padding: 14px 18px;
+      border: none;
+      border-radius: 8px;
+      font-size: 16px;
+      cursor: pointer;
+      width: 200px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      transition: background 0.2s, color 0.2s;
+    }
+
+    .boton:hover {
+      background: #c60074;
+    }
+
+    .boton:hover svg {
+      stroke: #fff;
+    }
+
+    .boton svg {
+      width: 20px;
+      height: 20px;
+      stroke: white;
+      transition: stroke 0.2s;
+    }
+
+    .submenu-contenido {
+      display: none;
+      position: absolute;
+      background-color: white;
+      border-radius: 6px;
+      padding: 8px 0;
+      z-index: 1;
+      width: 200px;
+      top: 100%;
+      left: 0;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+
+    .submenu-contenido a {
+      color: #ec008c;
+      padding: 10px 15px;
+      text-decoration: none;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 15px;
+      transition: background 0.2s;
+    }
+
+    .submenu-contenido a:hover {
+      background-color: #f9e4f1;
+    }
+
+    .submenu-contenido a svg {
+      width: 18px;
+      height: 18px;
+      stroke: #ec008c;
+      transition: stroke 0.2s;
+    }
+
+    .submenu-contenido a:hover svg {
+      stroke: #c60074;
+    }
+
+    .submenu:hover .submenu-contenido {
+      display: block;
+    }
+  </style>
+</head>
+<body>
+  <div class="contenedor">
+    <img src="logo-dinex.png" alt="Logo DinEX" class="logo">
+    <h1>Panel de Administración</h1>
+
+    <div class="menu">
+      <div class="submenu">
+        <button class="boton"><i data-lucide="users"></i>Gestión</button>
+        <div class="submenu-contenido">
+          <a href="crear-usuario.html"><i data-lucide="user-plus"></i>Crear Usuario</a>
+          <a href="eliminar.html"><i data-lucide="user-minus"></i>Eliminar Usuario</a>
+          <a href="desactivar.html"><i data-lucide="user-x"></i>Desactivar Usuario</a>
+          <a href="activar.html"><i data-lucide="user-check"></i>Activar Usuario</a>
+        </div>
+      </div>
+
+      <div class="submenu">
+        <button class="boton"><i data-lucide="clock-4"></i>Registros</button>
+        <div class="submenu-contenido">
+          <a href="corregir.html"><i data-lucide="edit"></i>Corregir Horas</a>
+          <a href="reporte.html"><i data-lucide="file-text"></i>Ver Reportes</a>
+          <a href="reporte-todos.html"><i data-lucide="layers"></i>Reporte Global</a>
+        </div>
+      </div>
+
+      <div class="submenu">
+        <button class="boton"><i data-lucide="settings"></i>Sistema</button>
+        <div class="submenu-contenido">
+          <a href="empleados.html"><i data-lucide="users"></i>Usuarios</a>
+          <a href="empleados_inactivos.html"><i data-lucide="user-x"></i>Empleados Inactivos</a>
+          <a href="index.html"><i data-lucide="log-out"></i>Cerrar Sesión</a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    lucide.createIcons();
+
+    // ⏳ SISTEMA DE CIERRE POR INACTIVIDAD (30 MINUTOS)
+    let tiempoInactividad;
+
+    function reiniciarTemporizador() {
+      clearTimeout(tiempoInactividad);
+      tiempoInactividad = setTimeout(cerrarSesionPorInactividad, 30 * 60 * 1000); // 30 minutos
+    }
+
+    function cerrarSesionPorInactividad() {
+      alert("Sesión cerrada por inactividad.");
+      sessionStorage.clear();
+      window.location.href = "admin-login.html";
+    }
+
+    ['click', 'mousemove', 'keypress', 'scroll'].forEach(evt => {
+      document.addEventListener(evt, reiniciarTemporizador);
+    });
+
+    reiniciarTemporizador();
+  </script>
+</body>
+</html>

@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Usuarios Inactivos</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <style>
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      margin: 0;
+      background: #f4f6f8;
+      color: #333;
+    }
+    .menu-bar {
+      background: #ffffff;
+      padding: 1rem 2rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid #ddd;
+      position: sticky;
+      top: 0;
+      z-index: 1000;
+    }
+    .menu-bar h1 {
+      margin: 0;
+      color: #84ae05;
+    }
+    .dropdown {
+      position: relative;
+      display: inline-block;
+    }
+    .dropbtn {
+      background-color: #cc0088;
+      color: white;
+      padding: 10px 16px;
+      font-size: 16px;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+    .dropbtn:hover {
+      background-color: #b10077;
+    }
+    .dropdown-content {
+      display: none;
+      position: absolute;
+      right: 0;
+      background-color: white;
+      min-width: 160px;
+      box-shadow: 0px 8px 16px rgba(0,0,0,0.2);
+      z-index: 1;
+      border-radius: 6px;
+      overflow: hidden;
+    }
+    .dropdown-content a {
+      color: #333;
+      padding: 12px 16px;
+      text-decoration: none;
+      display: block;
+      font-size: 15px;
+    }
+    .dropdown-content a:hover {
+      background-color: #f1f1f1;
+    }
+    .dropdown:hover .dropdown-content {
+      display: block;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 2rem auto;
+      padding: 2rem;
+      background: white;
+      border-radius: 16px;
+      box-shadow: 0 0 15px rgba(0,0,0,0.05);
+    }
+
+    h2 {
+      color: #84ae05;
+      text-align: center;
+      margin-top: 2rem;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 2rem;
+    }
+
+    th {
+      background-color: #287fba;
+      color: white;
+      padding: 14px;
+      text-align: left;
+      font-weight: bold;
+    }
+
+    td {
+      padding: 14px;
+      border-bottom: 1px solid #eee;
+      vertical-align: middle;
+    }
+
+    tr:hover {
+      background-color: #f9f9f9;
+      transition: background 0.3s ease;
+    }
+
+    .badge {
+      padding: 6px 12px;
+      border-radius: 12px;
+      font-size: 14px;
+      font-weight: 600;
+      display: inline-block;
+    }
+    .badge-eliminado {
+      background-color: #f44336;
+      color: white;
+    }
+    .badge-desactivado {
+      background-color: #ffc107;
+      color: #333;
+    }
+  </style>
+</head>
+<body>
+  <div class="menu-bar">
+    <h1>Usuarios Inactivos</h1>
+    <div class="dropdown">
+      <button class="dropbtn">⋮ Opciones</button>
+      <div class="dropdown-content">
+        <a href="#" onclick="exportarBitacoraPDF()">Exportar a PDF</a>
+        <a href="#" onclick="exportarBitacoraExcel()">Exportar a Excel</a>
+        <a href="admin.html">Volver al Panel</a>
+      </div>
+    </div>
+  </div>
+
+  <div class="container">
+    <table id="tabla-inactivos">
+      <thead>
+        <tr>
+          <th>Nombre</th>
+          <th>Departamento</th>
+          <th>Estado</th>
+          <th>Fecha Creación</th>
+          <th>Fecha Baja</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+
+    <h2>Registro de Marcación</h2>
+    <table id="tabla-bitacora">
+      <thead>
+        <tr>
+          <th>Fecha y Hora</th>
+          <th>Tipo de Marcaje</th>
+          <th>Dirección IP</th>
+          <th>Departamento</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+  <img id="logoDinex" src="logo-dinex.png" style="display:none;" />
+
+  <script>
+    let dataInactivos = [];
+    let nombreEmpleadoActual = "";
+
+    // ✅ NUEVA FUNCIÓN para cambiar formato de fecha
+    function formatearFecha(fechaISO) {
+      if (!fechaISO) return '-';
+      const fecha = new Date(fechaISO);
+      const mes = String(fecha.getMonth() + 1).padStart(2, '0');
+      const dia = String(fecha.getDate()).padStart(2, '0');
+      const anio = fecha.getFullYear();
+      return `${mes}/${dia}/${anio}`;
+    }
+
+    async function cargarEmpleadosInactivos() {
+      const res = await fetch('http://localhost:3000/api/empleados-inactivos');
+      dataInactivos = await res.json();
+      const tbody = document.querySelector('#tabla-inactivos tbody');
+      tbody.innerHTML = '';
+      dataInactivos.forEach((emp, index) => {
+        const estadoClase = emp.estado === "Eliminado" ? "badge badge-eliminado" : "badge badge-desactivado";
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${emp.nombre}</td>
+          <td>${emp.departamento}</td>
+          <td><span class="${estadoClase}">${emp.estado}</span></td>
+          <td>${formatearFecha(emp.fecha_creacion)}</td>
+          <td>${formatearFecha(emp.fecha_baja)}</td>
+        `;
+        tr.style.cursor = 'pointer';
+        tr.addEventListener('click', () => mostrarBitacora(index));
+        tbody.appendChild(tr);
+      });
+    }
+
+    function mostrarBitacora(index) {
+      const registros = dataInactivos[index].registros;
+      const tbody = document.querySelector('#tabla-bitacora tbody');
+      tbody.innerHTML = '';
+      nombreEmpleadoActual = dataInactivos[index].nombre;
+      registros.forEach(reg => {
+        const tr = document.createElement('tr');
+        const fechaHora = `${formatearFecha(reg.fecha)} ${reg.hora}`;
+        tr.innerHTML = `
+          <td>${fechaHora}</td>
+          <td>${reg.tipo}</td>
+          <td>${reg.ip}</td>
+          <td>${reg.departamento || '-'}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    async function exportarBitacoraPDF() {
+      if (!nombreEmpleadoActual) return alert("Selecciona un empleado.");
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF();
+      const img = document.getElementById('logoDinex');
+      if (!img.complete) await new Promise(resolve => img.onload = resolve);
+      const canvas = document.createElement('canvas');
+      canvas.width = img.naturalWidth;
+      canvas.height = img.naturalHeight;
+      canvas.getContext('2d').drawImage(img, 0, 0);
+      const logoBase64 = canvas.toDataURL('image/png');
+      doc.addImage(logoBase64, 'PNG', 150, 10, 40, 15);
+      doc.setFontSize(12);
+      doc.text(`Record del Empleado: ${nombreEmpleadoActual}`, 14, 20);
+      const filas = [];
+      document.querySelectorAll("#tabla-bitacora tbody tr").forEach(tr => {
+        const celdas = [...tr.children].map(td => td.textContent.trim());
+        filas.push(celdas);
+      });
+      doc.autoTable({ head: [["Fecha y Hora", "Tipo de Marcaje", "Dirección IP", "Departamento"]], body: filas, startY: 30 });
+      doc.save(`bitacora_${nombreEmpleadoActual.replaceAll(" ", "_").toLowerCase()}.pdf`);
+    }
+
+    function exportarBitacoraExcel() {
+      if (!nombreEmpleadoActual) return alert("Selecciona un empleado.");
+      const tabla = document.getElementById("tabla-bitacora");
+      const wb = XLSX.utils.book_new();
+      const ws = XLSX.utils.table_to_sheet(tabla);
+      XLSX.utils.book_append_sheet(wb, ws, "Bitácora");
+      const nombreArchivo = `bitacora_${nombreEmpleadoActual.replaceAll(" ", "_").toLowerCase()}.xlsx`;
+      XLSX.writeFile(wb, nombreArchivo);
+    }
+
+    document.addEventListener('DOMContentLoaded', cargarEmpleadosInactivos);
+  </script>
+</body>
+</html>

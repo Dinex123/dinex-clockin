@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Eliminar Usuario</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="contenedor">
+    <img src="logo-dinex.png" alt="Logo DinEX" class="logo">
+    <h1>Eliminar Usuario</h1>
+    <form id="eliminarForm">
+      <input type="text" id="usuario" placeholder="Usuario a eliminar" required><br><br>
+      <button type="submit" class="boton">Eliminar</button>
+      <p id="mensaje"></p>
+    </form>
+    <br>
+    <a href="admin.html" class="boton">Volver al Panel</a>
+  </div>
+
+  <script>
+    document.getElementById('eliminarForm').addEventListener('submit', async function(e) {
+      e.preventDefault();
+      const usuario = document.getElementById('usuario').value;
+
+      const response = await fetch('/api/eliminar-usuario', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ usuario })
+      });
+
+      const result = await response.json();
+      const mensaje = document.getElementById('mensaje');
+      if (result.success) {
+        mensaje.style.color = 'green';
+        mensaje.textContent = 'Usuario marcado como eliminado (inactivo)';
+      } else {
+        mensaje.style.color = 'red';
+        mensaje.textContent = 'No se encontró el usuario';
+      }
+    });
+  </script>
+</body>
+</html>

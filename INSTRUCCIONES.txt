@@ -1,0 +1,14 @@
+INSTRUCCIONES PARA INSTALAR Y USAR CLOCKIN DINEX
+
+1. Asegúrate de tener instalado Node.js desde:
+   https://nodejs.org/
+
+2. Descomprime este archivo ZIP en una carpeta.
+
+3. Haz doble clic en 'iniciar.bat'. El sistema instalará las dependencias y abrirá el navegador.
+
+4. Usa http://localhost:3000 para acceder al sistema.
+
+USUARIO ADMIN:
+usuario: admin
+contraseña: admin123

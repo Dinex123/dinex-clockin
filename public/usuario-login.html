@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Login Usuario</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="contenedor">
+    <img src="logo-dinex.png" alt="Logo DinEX" class="logo">
+    <h1>Acceso Usuario</h1>
+    <form id="loginForm">
+      <input type="text" id="usuario" placeholder="Usuario" required><br><br>
+      <input type="password" id="contrasena" placeholder="Contraseña" required><br><br>
+      <button type="submit" class="boton">Iniciar Sesión</button>
+      <p id="error" style="color:red;"></p>
+    </form>
+  </div>
+
+  <script>
+    document.getElementById('loginForm').addEventListener('submit', async function(e) {
+      e.preventDefault();
+      const usuario = document.getElementById('usuario').value;
+      const contrasena = document.getElementById('contrasena').value;
+
+      const response = await fetch('/api/login-usuario', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ usuario, contrasena })
+      });
+
+      const result = await response.json();
+      if (result.success) {
+        // Guardamos usuario y departamento en sessionStorage
+        sessionStorage.setItem("usuario", usuario);
+        sessionStorage.setItem("departamento", result.departamento);
+        // Redirigimos al panel de usuario
+        window.location.href = 'usuario.html';
+      } else {
+        document.getElementById('error').textContent = 'Credenciales incorrectas';
+      }
+    });
+  </script>
+</body>
+</html>

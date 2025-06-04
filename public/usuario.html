@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Panel Usuario</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="contenedor">
+    <img src="logo-dinex.png" alt="Logo DinEX" class="logo">
+    <h1>Panel del Usuario</h1>
+    <div class="botones">
+      <button onclick="registrar('entrada')" class="boton">Entrada</button>
+      <button onclick="registrar('salida_lunch')" class="boton">Lunch Out</button>
+      <button onclick="registrar('entrada_lunch')" class="boton">Lunch In</button>
+      <button onclick="registrar('salida')" class="boton">Salida</button>
+      <a href="index.html" class="boton">Cerrar Sesión</a>
+    </div>
+
+    <p id="mensaje" style="margin-top: 20px;"></p>
+  </div>
+
+  <script>
+    async function registrar(tipo) {
+      const usuario = sessionStorage.getItem("usuario");
+      const departamento = sessionStorage.getItem("departamento");
+      if (!usuario) {
+        alert("Sesión expirada. Vuelve a iniciar sesión.");
+        return window.location.href = "usuario-login.html";
+      }
+      const res = await fetch('/api/marcar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ usuario, tipo, departamento })
+      });
+      const resultado = await res.json();
+      const mensajeEl = document.getElementById("mensaje");
+      mensajeEl.style.color = resultado.success ? "green" : "red";
+      mensajeEl.textContent = resultado.mensaje;
+    }
+
+    // ⏳ SISTEMA DE CIERRE POR INACTIVIDAD (30 MINUTOS)
+    let tiempoInactividad;
+
+    function reiniciarTemporizador() {
+      clearTimeout(tiempoInactividad);
+      tiempoInactividad = setTimeout(cerrarSesionPorInactividad, 30 * 60 * 1000); // 30 minutos
+    }
+
+    function cerrarSesionPorInactividad() {
+      alert("Sesión cerrada por inactividad.");
+      sessionStorage.clear();
+      window.location.href = "usuario-login.html";
+    }
+
+    ['click', 'mousemove', 'keypress', 'scroll'].forEach(evt => {
+      document.addEventListener(evt, reiniciarTemporizador);
+    });
+
+    reiniciarTemporizador();
+  </script>
+
+  <style>
+    .boton.danger {
+      background: #ea1902;
+    }
+
+    .botones {
+      text-align: center;
+      margin: 20px 0;
+    }
+
+    .boton {
+      background-color: #ec008c;
+      color: white;
+      border: none;
+      padding: 8px 16px;
+      margin: 5px;
+      border-radius: 5px;
+      cursor: pointer;
+      transition: background 0.3s ease;
+    }
+
+    .boton:hover {
+      background-color: #c60074;
+    }
+
+    table.dinex-table {
+      width: 90%;
+      margin: 20px auto;
+      border-collapse: collapse;
+      font-size: 14px;
+      text-align: center;
+      box-shadow: 0 0 5px rgba(0,0,0,0.1);
+    }
+
+    table.dinex-table th {
+      background-color: #ec008c;
+      color: white;
+      padding: 10px;
+      font-weight: bold;
+    }
+
+    table.dinex-table td {
+      padding: 8px;
+    }
+
+    table.dinex-table tr:nth-child(even) {
+      background-color: #fce8f3;
+    }
+
+    table.dinex-table tr:hover {
+      background-color: #fff0fa;
+    }
+
+    h1 {
+      text-align: center;
+      margin-bottom: 10px;
+      color: #85b200;
+    }
+
+    label {
+      margin: 0 10px;
+    }
+
+    .contenedor {
+      max-width: 1100px;
+      margin: auto;
+      padding: 20px;
+    }
+
+    .logo {
+      display: block;
+      margin: 0 auto 10px auto;
+      max-width: 220px;
+    }
+  </style>
+</body>
+</html>

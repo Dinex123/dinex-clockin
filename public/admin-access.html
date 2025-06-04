@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Acceso Administrador</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="contenedor">
+    <img src="logo-dinex.png" alt="Logo DinEX" class="logo">
+    <h1>Acceso Administrador</h1>
+
+    <form class="formulario" onsubmit="event.preventDefault(); acceder();">
+      <div class="campo">
+        <label for="usuario">Usuario:</label>
+        <input type="text" id="usuario" required>
+      </div>
+      <div class="campo">
+        <label for="clave">Contraseña:</label>
+        <input type="password" id="clave" required>
+      </div>
+      <div style="text-align:center;">
+        <button type="submit" class="boton">Entrar</button>
+      </div>
+    </form>
+
+    <p id="mensaje" style="color:red; text-align:center;"></p>
+  </div>
+
+  <script>
+    async function acceder() {
+      const usuario = document.getElementById('usuario').value.trim();
+      const clave   = document.getElementById('clave').value.trim();
+
+      if (!usuario || !clave) {
+        document.getElementById('mensaje').textContent = "Por favor completa ambos campos.";
+        return;
+      }
+
+      const res = await fetch('/api/admin-login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: usuario, password: clave })
+      });
+
+      const data = await res.json();
+      if (data.success) {
+        sessionStorage.setItem("admin", usuario);
+        window.location.href = 'admin.html';
+      } else {
+        document.getElementById('mensaje').textContent = "Credenciales incorrectas.";
+      }
+    }
+  </script>
+
+  <style>
+    .contenedor {
+      max-width: 400px;
+      margin: auto;
+      padding: 30px 20px;
+    }
+
+    .logo {
+      max-width: 200px;
+      display: block;
+      margin: 0 auto 20px auto;
+    }
+
+    h1 {
+      text-align: center;
+      margin-bottom: 30px;
+      color: #85b100;
+    }
+
+    .formulario {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .campo {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .campo label {
+      width: 100px;
+      text-align: right;
+      margin-right: 10px;
+      font-weight: bold;
+    }
+
+    .campo input {
+      flex: 1;
+      padding: 8px;
+      border: 1px solid #ccc;
+      border-radius: 5px;
+    }
+
+    .boton {
+      background-color: #ec008c;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+
+    .boton:hover {
+      background-color: #c60074;
+    }
+  </style>
+</body>
+</html>

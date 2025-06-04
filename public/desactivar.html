@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Desactivar Usuario</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="contenedor">
+    <img src="logo-dinex.png" alt="Logo DinEX" class="logo">
+    <h1>Desactivar Usuario</h1>
+    <form id="desactivarForm">
+      <input type="text" id="usuario" placeholder="Usuario a desactivar" required><br><br>
+      <button type="submit" class="boton">Desactivar</button>
+      <p id="mensaje"></p>
+    </form>
+    <br>
+    <a href="admin.html" class="boton">Volver al Panel</a>
+  </div>
+  <script>
+    document.getElementById('desactivarForm').addEventListener('submit', async function(e) {
+      e.preventDefault();
+      const usuario = document.getElementById('usuario').value;
+
+      const response = await fetch('/api/desactivar-usuario', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ usuario })
+      });
+
+      const result = await response.json();
+      const mensaje = document.getElementById('mensaje');
+      if (result.success) {
+        mensaje.style.color = 'green';
+        mensaje.textContent = 'Usuario desactivado exitosamente';
+      } else {
+        mensaje.style.color = 'red';
+        mensaje.textContent = 'No se encontró el usuario';
+      }
+    });
+  </script>
+</body>
+</html>
