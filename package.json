@@ -1,5 +1,5 @@
 {
-  "name": "clockin-dinex",
+  "name": "dinex-clockin",
   "version": "1.0.0",
   "main": "server.js",
   "scripts": {
@@ -7,9 +7,10 @@
   },
   "dependencies": {
     "express": "^4.18.2",
-    "fs-extra": "^11.3.0",
+    "sqlite3": "^5.1.6",
     "moment-timezone": "^0.5.48",
+    "fs-extra": "^11.2.0",
     "node-cron": "^4.0.7",
-    "sqlite3": "^5.1.7"
+    "body-parser": "^1.20.2"
   }
 }
