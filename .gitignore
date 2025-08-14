@@ -1,2 +1,11 @@
+# dependencias y entorno
 node_modules
 .env
+
+# datos locales (¡no subir!)
+backups
+db
+*.db
+marcajes*.json
+users.json
+admins.json
