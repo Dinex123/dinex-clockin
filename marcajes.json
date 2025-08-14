@@ -1,1 +1,66 @@
-[]
+[
+  {
+    "usuario": "jose",
+    "tipo": "entrada",
+    "fecha": "2025-08-14",
+    "hora": "17:16:52",
+    "ip": "::1",
+    "departamento": "Corporativo",
+    "lat": 42.395111,
+    "lng": 18.907705,
+    "accuracy": 72,
+    "insideGeofence": false,
+    "geofenceId": null,
+    "geofenceName": null,
+    "distanceToCenterM": null,
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36 Edg/139.0.0.0"
+  },
+  {
+    "usuario": "jose",
+    "tipo": "salida_lunch",
+    "fecha": "2025-08-14",
+    "hora": "17:16:53",
+    "ip": "::1",
+    "departamento": "Corporativo",
+    "lat": 42.395111,
+    "lng": 18.907705,
+    "accuracy": 72,
+    "insideGeofence": false,
+    "geofenceId": null,
+    "geofenceName": null,
+    "distanceToCenterM": null,
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36 Edg/139.0.0.0"
+  },
+  {
+    "usuario": "jose",
+    "tipo": "entrada_lunch",
+    "fecha": "2025-08-14",
+    "hora": "17:16:54",
+    "ip": "::1",
+    "departamento": "Corporativo",
+    "lat": 42.395111,
+    "lng": 18.907705,
+    "accuracy": 72,
+    "insideGeofence": false,
+    "geofenceId": null,
+    "geofenceName": null,
+    "distanceToCenterM": null,
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36 Edg/139.0.0.0"
+  },
+  {
+    "usuario": "jose",
+    "tipo": "salida",
+    "fecha": "2025-08-14",
+    "hora": "17:16:56",
+    "ip": "::1",
+    "departamento": "Corporativo",
+    "lat": 42.395111,
+    "lng": 18.907705,
+    "accuracy": 72,
+    "insideGeofence": false,
+    "geofenceId": null,
+    "geofenceName": null,
+    "distanceToCenterM": null,
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36 Edg/139.0.0.0"
+  }
+]

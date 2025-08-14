@@ -10,22 +10,89 @@ const moment     = require('moment-timezone');
 const sqlite3    = require('sqlite3').verbose();
 
 const app  = express();
-const PORT = 3000;
-const db   = new sqlite3.Database('./db/dev.db');
+
+// Render te da el puerto en una variable
+const PORT = process.env.PORT || 3000;
+
+// Directorio de datos (en Render será /data; en tu PC queda esta misma carpeta)
+const DATA_DIR = process.env.DATA_DIR || __dirname;
+
+// Rutas importantes
+const PATHS = {
+  dbFile:      path.join(DATA_DIR, 'db', 'dev.db'),
+  marcajes:    path.join(DATA_DIR, 'marcajes.json'),
+  users:       path.join(DATA_DIR, 'users.json'),
+  admins:      path.join(DATA_DIR, 'admins.json'),
+  backupsDir:  path.join(DATA_DIR, 'backups')
+};
+
+// Crea carpetas si faltan
+fs.mkdirSync(path.join(DATA_DIR, 'db'), { recursive: true });
+fs.mkdirSync(PATHS.backupsDir, { recursive: true });
+
+// Si no existen estos JSON, créalos vacíos
+function ensureJson(filePath, fallback = '[]') {
+  if (!fs.existsSync(filePath)) fs.writeFileSync(filePath, fallback, 'utf8');
+}
+ensureJson(PATHS.marcajes, '[]');
+ensureJson(PATHS.users, '[]');
+ensureJson(PATHS.admins, '[]'); // si no usas admins, igual déjalo
+
+// Confía en el proxy para obtener la IP real en Render
+app.set('trust proxy', true);
+
+// Conecta SQLite usando la ruta persistente
+const db = new sqlite3.Database(PATHS.dbFile);
 
 // 1) Middleware para parsear JSON
 app.use(bodyParser.json());
+// ====== Geocerca (configura tu sede) ======
+//Coordenadas de la oficina (Google Maps)
+const OFFICES = [
+  { id: 'TX-116', name: 'Sede 1 - Quickstop',  lat: 29.71694, lng: -95.48804, radiusMeters: 150 },
+  { id: 'TX-117', name: 'Sede 2 - Rosemberg',  lat: 29.57039, lng: -95.77575, radiusMeters: 150 },
+  { id: 'TX-1293', name: 'Sede 3 - South West',  lat: 29.70031, lng: -95.28904, radiusMeters: 150 },
+  { id: 'TX-1386', name: 'Sede 4 - LongPoint',  lat: 29.79806, lng: -95.52474, radiusMeters: 150 },
+  { id: 'TX-1615', name: 'Sede 5 - Rampart',  lat: 29.71948, lng: -95.48853, radiusMeters: 150 },
+  { id: 'TX-839', name: 'Sede 6 - Rosemberg C',  lat: 29.55853, lng: -95.80851, radiusMeters: 150 },
+  { id: 'TX-845', name: 'Sede 7 - Airline',  lat: 29.89497, lng: -95.39804, radiusMeters: 150 },
+  { id: 'TX-1544', name: 'Sede 8 - Fry',  lat: 29.79521, lng: -95.71863, radiusMeters: 150 },
+  { id: 'TX-104', name: 'Sede 9 - Fulton',  lat: 29.83249, lng: -95.37564, radiusMeters: 150 },
+  { id: 'TX-101', name: 'Sede 10 - Office', lat: 29.74978, lng: -95.48319, radiusMeters: 150 },
+];
+
+// ====== Utilidades geográficas ======
+function distanceMeters(lat1, lon1, lat2, lon2) {
+  const R = 6371000;
+  const toRad = d => d * Math.PI / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLon = toRad(lon2 - lon1);
+  const a = Math.sin(dLat/2)**2 + Math.cos(toRad(lat1))*Math.cos(toRad(lat2))*Math.sin(dLon/2)**2;
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  return R * c;
+}
+
+function findGeofence(lat, lng) {
+  for (const g of OFFICES) {
+    const d = distanceMeters(lat, lng, g.lat, g.lng);
+    if (d <= g.radiusMeters) return { ...g, distance: d, inside: true };
+  }
+  return { inside: false };
+}
+
+// Modo: true = BLOQUEA si está fuera; false = permite pero marca como "fuera"
+const MODO_ESTRICTO = false;
 
 // BACKUP AUTOMATICO A LAS 11PM
-const backupFolder = path.join(__dirname, 'backups');
+const backupFolder = PATHS.backupsDir;
 if (!fs.existsSync(backupFolder)) fs.mkdirSync(backupFolder);
 
 cron.schedule('0 23 * * *', () => {
   const fecha = new Date().toISOString().split('T')[0];
-  const origenJSON = path.join(__dirname, 'marcajes.json');
-  const destinoJSON = path.join(backupFolder, `marcajes-${fecha}.json`);
-  const origenDB = path.join(__dirname, 'db/dev.db');
-  const destinoDB = path.join(backupFolder, `dev-${fecha}.db`);
+  const origenJSON  = PATHS.marcajes;
+const destinoJSON = path.join(backupFolder, `marcajes-${fecha}.json`);
+const origenDB    = PATHS.dbFile;
+const destinoDB   = path.join(backupFolder, `dev-${fecha}.db`);
 
   try {
     fse.copySync(origenJSON, destinoJSON);
@@ -39,10 +106,10 @@ cron.schedule('0 23 * * *', () => {
 // BACKUP MANUAL
 app.get('/api/backup-now', (req, res) => {
   const fecha = new Date().toISOString().split('T')[0];
-  const origenJSON = path.join(__dirname, 'marcajes.json');
+  const origenJSON  = PATHS.marcajes;
   const destinoJSON = path.join(backupFolder, `marcajes-${fecha}.json`);
-  const origenDB = path.join(__dirname, 'db/dev.db');
-  const destinoDB = path.join(backupFolder, `dev-${fecha}.db`);
+  const origenDB    = PATHS.dbFile;
+  const destinoDB   = path.join(backupFolder, `dev-${fecha}.db`);
 
   try {
     fse.copySync(origenJSON, destinoJSON);
@@ -58,14 +125,14 @@ app.get('/api/backup-now', (req, res) => {
 // 2.2) Login administrador
 app.post('/api/admin-login', (req, res) => {
   const { username, password } = req.body;
-  const admins = JSON.parse(fs.readFileSync('admins.json', 'utf8'));
+  const admins = JSON.parse(fs.readFileSync(PATHS.admins, 'utf8'));
   const valid  = admins.some(a => a.username === username && a.password === password);
   res.json({ success: valid });
 });
 
 // 2.3) Crear usuario con fecha de creación
 app.post('/api/crear-usuario', (req, res) => {
-  const uPath = path.join(__dirname, 'users.json');
+  const uPath = PATHS.users;
   if (!fs.existsSync(uPath)) fs.writeFileSync(uPath, '[]', 'utf8');
   
   const users = JSON.parse(fs.readFileSync(uPath, 'utf8'));
@@ -93,7 +160,7 @@ app.post('/api/crear-usuario', (req, res) => {
 
 // 2.4) Login usuario (devuelve departamento)
 app.post('/api/login-usuario', (req, res) => {
-  const uPath = path.join(__dirname, 'users.json');
+  const uPath = PATHS.users;
   if (!fs.existsSync(uPath)) return res.json({ success: false });
   const users = JSON.parse(fs.readFileSync(uPath, 'utf8'));
   const u = users.find(u =>
@@ -107,9 +174,9 @@ app.post('/api/login-usuario', (req, res) => {
   );
 });
 
-// 2.5) Marcaje con límite de 4 por día y zona Houston
+// 2.5) Marcaje con límite de 4 por día + geolocalización
 app.post('/api/marcar', (req, res) => {
-  const p = path.join(__dirname, 'marcajes.json');
+  const p = PATHS.marcajes;
   let all = [];
   try {
     const raw = fs.readFileSync(p, 'utf8').trim();
@@ -121,9 +188,35 @@ app.post('/api/marcar', (req, res) => {
   const now = moment().tz('America/Chicago');
   const fechaHoy = now.format('YYYY-MM-DD');
   const hora = now.format('HH:mm:ss');
+
   const usuario = req.body.usuario;
   const tipo = req.body.tipo;
+  const departamento = req.body.departamento || '';
 
+  // === NUEVO: ubicación desde el front (lat/lng/accuracy) ===
+  const location = req.body.location || null;
+  const lat = location && typeof location.lat === 'number' ? location.lat : null;
+  const lng = location && typeof location.lng === 'number' ? location.lng : null;
+  const accuracy = location && typeof location.accuracy === 'number' ? location.accuracy : null;
+
+  // Si queremos obligar ubicación para marcar:
+  if (lat === null || lng === null) {
+    return res.status(400).json({
+      success: false,
+      mensaje: 'Faltan coordenadas. Debes permitir la ubicación para marcar.'
+    });
+  }
+
+  // Validar geocerca
+  const gf = findGeofence(lat, lng);
+  if (MODO_ESTRICTO && !gf.inside) {
+    return res.status(403).json({
+      success: false,
+      mensaje: 'Marcaje rechazado: estás fuera del área permitida.'
+    });
+  }
+
+  // === LÓGICA EXISTENTE (auto salida del día anterior) ===
   const fechaAyer = moment(now).subtract(1, 'day').format('YYYY-MM-DD');
   const registrosAyer = all.filter(r => r.usuario === usuario && r.fecha === fechaAyer);
 
@@ -139,25 +232,35 @@ app.post('/api/marcar', (req, res) => {
       fecha: fechaAyer,
       hora: '20:00:00',
       ip: req.ip,
-      departamento: req.body.departamento || '',
-      auto: true
+      departamento: departamento,
+      auto: true,
+
+      // Campos de ubicación no aplican aquí (es un cierre automático)
+      lat: null,
+      lng: null,
+      accuracy: null,
+      insideGeofence: null,
+      geofenceId: null,
+      geofenceName: null,
+      distanceToCenterM: null,
+      userAgent: req.headers['user-agent'] || null
     };
     all.push(autoSalida);
     advertencia = "⚠️ Se detectó que ayer no se marcó salida. Se registró una salida automática a las 20:00.";
 
-    // También lo guardamos en SQLite
+    // Guardamos en SQLite (sin columnas de ubicación por ahora)
     db.run(
       `INSERT INTO registros (usuario, tipo, fecha, hora, ip, departamento) VALUES (?, ?, ?, ?, ?, ?)`,
-      [usuario, 'salida', fechaAyer, '20:00:00', req.ip, req.body.departamento || '']
+      [usuario, 'salida', fechaAyer, '20:00:00', req.ip, departamento]
     );
   }
 
+  // Evitar duplicado de tipo en el día
   const yaMarcadoHoy = all.some(r =>
     r.usuario === usuario &&
     r.fecha === fechaHoy &&
     r.tipo === tipo
-  );
-
+  )
   if (yaMarcadoHoy) {
     return res.json({
       success: false,
@@ -165,49 +268,66 @@ app.post('/api/marcar', (req, res) => {
     });
   }
 
+  // Máximo 4 marcajes
   const count = all.filter(x => x.usuario === usuario && x.fecha === fechaHoy).length;
   if (count >= 4) {
     return res.json({ success: false, mensaje: 'Su turno ya terminó.' });
   }
 
+  // === NUEVO: guardamos ubicación y veredicto de geocerca en JSON ===
   const nuevoMarcaje = {
     usuario,
     tipo,
     fecha: fechaHoy,
     hora,
     ip: req.ip,
-    departamento: req.body.departamento || ''
+    departamento,
+
+    lat, lng, accuracy,
+    insideGeofence: gf.inside,
+    geofenceId: gf.inside ? gf.id : null,
+    geofenceName: gf.inside ? gf.name : null,
+    distanceToCenterM: gf.distance ? Math.round(gf.distance) : null,
+    userAgent: req.headers['user-agent'] || null
   };
 
-  // Guardamos en JSON
+  // Guardar en JSON
   all.push(nuevoMarcaje);
   fs.writeFileSync(p, JSON.stringify(all, null, 2), 'utf8');
 
-  // Guardamos en SQLite también
+  // Guardar en SQLite (mantengo tu esquema actual SIN columnas nuevas)
   db.run(
     `INSERT INTO registros (usuario, tipo, fecha, hora, ip, departamento) VALUES (?, ?, ?, ?, ?, ?)`,
-    [usuario, tipo, fechaHoy, hora, req.ip, req.body.departamento || '']
+    [usuario, tipo, fechaHoy, hora, req.ip, departamento]
   );
 
   const mensajeFinal = advertencia
     ? `${advertencia}\nMarcaje de ${tipo} registrado a las ${hora}.`
     : `Marcaje de ${tipo} registrado a las ${hora}.`;
 
-  res.json({ success: true, mensaje: mensajeFinal });
+  // Si MODO_ESTRICTO=false y está fuera, lo avisamos en el mensaje
+  const suffix = (!MODO_ESTRICTO && !gf.inside) ? ' (fuera de geocerca)' : '';
+
+  res.json({
+    success: true,
+    mensaje: mensajeFinal + suffix,
+    insideGeofence: gf.inside,
+    geofence: gf.inside ? { id: gf.id, name: gf.name, distanceM: Math.round(gf.distance) } : null
+  });
 });
 
 // 2.6) Reporte por usuario CON IP (solo si el usuario está activo)
 app.get('/api/reporte', (req, res) => {
   const usuario = req.query.usuario;
-  const p = path.join(__dirname, 'marcajes.json');
-  const uPath = path.join(__dirname, 'users.json');
+  const p = PATHS.marcajes;
+  const uPath = PATHS.users;
 
   // Verificar que el usuario exista y esté activo
   if (!fs.existsSync(uPath)) return res.json([]);
   const users = JSON.parse(fs.readFileSync(uPath, 'utf8'));
   const user = users.find(u => u.usuario === usuario);
 
-  if (!user || user.activo === false) {
+  if (!user || user.activo !== true) {
     return res.json([]); // Usuario eliminado o no existe
   }
 
@@ -222,7 +342,7 @@ app.get('/api/reporte', (req, res) => {
 
 // 2.7) Listar empleados activos
 app.get('/api/empleados', (req, res) => {
-  const uPath = path.join(__dirname, 'users.json');
+  const uPath = PATHS.users;
   if (!fs.existsSync(uPath)) return res.json([]);
   const users = JSON.parse(fs.readFileSync(uPath, 'utf8'));
   res.json(users.filter(u => u.activo !== false));
@@ -230,7 +350,7 @@ app.get('/api/empleados', (req, res) => {
 
 // 2.7.1) Obtener diccionario de nombres completos por username
 app.get('/api/usuarios', (req, res) => {
-  const uPath = path.join(__dirname, 'users.json');
+  const uPath = PATHS.users;
   if (!fs.existsSync(uPath)) return res.status(404).json({ error: 'Archivo users.json no encontrado' });
 
   const users = JSON.parse(fs.readFileSync(uPath, 'utf8'));
@@ -244,8 +364,8 @@ app.get('/api/usuarios', (req, res) => {
 // 2.8) Reporte global (solo usuarios activos)
 app.get('/api/reporte-todos', (req, res) => {
   try {
-    const pMarcajes = path.join(__dirname, 'marcajes.json');
-    const pUsuarios = path.join(__dirname, 'users.json');
+    const pMarcajes = PATHS.marcajes;
+    const pUsuarios = PATHS.users;
 
     if (!fs.existsSync(pMarcajes) || !fs.existsSync(pUsuarios)) return res.json([]);
 
@@ -281,7 +401,7 @@ app.get('/api/reporte-todos', (req, res) => {
 app.delete('/api/borrar-marcaje', (req, res) => {
   try {
     const { usuario, index } = req.body;
-    const p = path.join(__dirname, 'marcajes.json');
+    const p = PATHS.marcajes;
     const raw = fs.readFileSync(p, 'utf8').trim();
     const all = raw ? JSON.parse(raw) : [];
 
@@ -311,7 +431,7 @@ app.delete('/api/borrar-marcaje', (req, res) => {
 app.delete('/api/limpiar-marcajes', (req, res) => {
   try {
     // Vaciar JSON
-    const p = path.join(__dirname, 'marcajes.json');
+    const p = PATHS.marcajes;
     fs.writeFileSync(p, '[]', 'utf8');
     // Vaciar tabla SQLite
     db.run('DELETE FROM registros', [], err => {
@@ -326,7 +446,7 @@ app.delete('/api/limpiar-marcajes', (req, res) => {
 
 // 2.11) Desactivar usuario
 app.post('/api/desactivar-usuario', (req, res) => {
-  const uPath = path.join(__dirname, 'users.json');
+  const uPath = PATHS.users;
   if (!fs.existsSync(uPath)) return res.json({ success: false });
   const users = JSON.parse(fs.readFileSync(uPath, 'utf8'));
   const idx   = users.findIndex(u => u.usuario === req.body.usuario);
@@ -339,7 +459,7 @@ app.post('/api/desactivar-usuario', (req, res) => {
 // 2.12) Eliminar usuario con fecha de baja
 app.post('/api/eliminar-usuario', (req, res) => {
   const { usuario } = req.body;
-  const filePath = path.join(__dirname, 'users.json');
+  const filePath = PATHS.users;
 
   if (!fs.existsSync(filePath)) {
     return res.json({ success: false, message: 'Archivo no encontrado' });
@@ -362,7 +482,7 @@ app.post('/api/eliminar-usuario', (req, res) => {
 
 // 2.13) Activar usuario
 app.post('/api/activar-usuario', (req, res) => {
-  const uPath = path.join(__dirname, 'users.json');
+  const uPath = PATHS.users;
   if (!fs.existsSync(uPath)) return res.json({ success: false });
   const users = JSON.parse(fs.readFileSync(uPath, 'utf8'));
   const u     = users.find(u => u.usuario === req.body.usuario);
@@ -375,7 +495,7 @@ app.post('/api/activar-usuario', (req, res) => {
 // 2.14) Corregir fecha y hora de un marcaje
 app.post('/api/corregir-hora', (req, res) => {
   try {
-    const p   = path.join(__dirname, 'marcajes.json');
+    const p   = PATHS.marcajes;
     const raw = fs.readFileSync(p, 'utf8').trim();
     const all = raw ? JSON.parse(raw) : [];
     const regs = all.filter(x => x.usuario === req.body.usuario);
@@ -409,7 +529,7 @@ app.post('/api/agregar-marcaje', (req, res) => {
     }
 
     // También guardar en JSON
-    const p = path.join(__dirname, 'marcajes.json');
+    const p = PATHS.marcajes;
     let all = [];
     try {
       const raw = fs.readFileSync(p, 'utf8').trim();
@@ -432,7 +552,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 // Ruta para obtener empleados inactivos y sus registros históricos (con fechas)
 app.get('/api/empleados-inactivos', (req, res) => {
-  const fsPath = path.join(__dirname, 'users.json');
+  const fsPath = PATHS.users;
   let usuariosJSON = [];
 
   if (fs.existsSync(fsPath)) {
@@ -484,7 +604,7 @@ app.listen(PORT, () => {
 
 app.post('/api/reset-password-admin', (req, res) => {
   const { usuario, nuevaClave } = req.body;
-  const uPath = path.join(__dirname, 'users.json');
+  const uPath = PATHS.users;
   if (!fs.existsSync(uPath)) return res.json({ success: false, message: "Archivo no encontrado" });
 
   const users = JSON.parse(fs.readFileSync(uPath, 'utf8'));

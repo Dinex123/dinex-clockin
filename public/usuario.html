@@ -21,43 +21,101 @@
   </div>
 
   <script>
-    async function registrar(tipo) {
-      const usuario = sessionStorage.getItem("usuario");
-      const departamento = sessionStorage.getItem("departamento");
-      if (!usuario) {
-        alert("Sesión expirada. Vuelve a iniciar sesión.");
-        return window.location.href = "usuario-login.html";
+     // ⚙️ Opciones de geolocalización
+  const GEO_OPTS = { enableHighAccuracy: false, timeout: 8000, maximumAge: 0 };
+
+  // Obtiene {lat, lng, accuracy} con una Promesa
+  function getCoords() {
+    return new Promise((resolve, reject) => {
+      if (!("geolocation" in navigator)) {
+        return reject(new Error("Tu navegador no soporta geolocalización."));
       }
-      const res = await fetch('/api/marcar', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ usuario, tipo, departamento })
-      });
-      const resultado = await res.json();
-      const mensajeEl = document.getElementById("mensaje");
-      mensajeEl.style.color = resultado.success ? "green" : "red";
-      mensajeEl.textContent = resultado.mensaje;
-    }
-
-    // ⏳ SISTEMA DE CIERRE POR INACTIVIDAD (30 MINUTOS)
-    let tiempoInactividad;
-
-    function reiniciarTemporizador() {
-      clearTimeout(tiempoInactividad);
-      tiempoInactividad = setTimeout(cerrarSesionPorInactividad, 30 * 60 * 1000); // 30 minutos
-    }
-
-    function cerrarSesionPorInactividad() {
-      alert("Sesión cerrada por inactividad.");
-      sessionStorage.clear();
-      window.location.href = "usuario-login.html";
-    }
-
-    ['click', 'mousemove', 'keypress', 'scroll'].forEach(evt => {
-      document.addEventListener(evt, reiniciarTemporizador);
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          const { latitude, longitude, accuracy } = pos.coords;
+          resolve({ lat: latitude, lng: longitude, accuracy });
+        },
+        (err) => {
+          if (err.code === 1) {
+            reject(new Error("Debes permitir el acceso a tu ubicación para marcar."));
+          } else if (err.code === 2) {
+            reject(new Error("Ubicación no disponible. Revisa conexión/GPS y vuelve a intentar."));
+          } else {
+            reject(new Error("La solicitud de ubicación tardó demasiado. Intenta nuevamente."));
+          }
+        },
+        GEO_OPTS
+      );
     });
+  }
 
-    reiniciarTemporizador();
+  // Deshabilita botones mientras se marca para evitar dobles clics
+  function setBotonesEnabled(enabled) {
+    document.querySelectorAll(".botones .boton").forEach(b => b.disabled = !enabled);
+  }
+
+  async function registrar(tipo) {
+    const mensajeEl = document.getElementById("mensaje");
+    const usuario = sessionStorage.getItem("usuario");
+    const departamento = sessionStorage.getItem("departamento");
+
+    if (!usuario) {
+      alert("Sesión expirada. Vuelve a iniciar sesión.");
+      window.location.href = "usuario-login.html";
+      return;
+    }
+
+    try {
+      setBotonesEnabled(false);
+      mensajeEl.style.color = "#333";
+      mensajeEl.textContent = "Obteniendo ubicación…";
+
+      // 1) Pedir ubicación
+      const location = await getCoords();
+
+      mensajeEl.textContent = "Registrando marcaje…";
+
+      // 2) Enviar al servidor con la ubicación
+      const res = await fetch("/api/marcar", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ usuario, tipo, departamento, location })
+      });
+
+      const data = await res.json();
+
+      if (!res.ok || data.success === false) {
+        // puede venir 400/403 del servidor o success:false
+        throw new Error(data.mensaje || "No se pudo registrar el marcaje.");
+      }
+
+      mensajeEl.style.color = "green";
+      mensajeEl.textContent = data.mensaje || "Marcaje registrado correctamente.";
+
+    } catch (e) {
+      console.error(e);
+      mensajeEl.style.color = "red";
+      mensajeEl.textContent = e.message || "Error al registrar el marcaje.";
+    } finally {
+      setBotonesEnabled(true);
+    }
+  }
+
+  // ⏳ SISTEMA DE CIERRE POR INACTIVIDAD (30 MINUTOS)
+  let tiempoInactividad;
+  function reiniciarTemporizador() {
+    clearTimeout(tiempoInactividad);
+    tiempoInactividad = setTimeout(cerrarSesionPorInactividad, 30 * 60 * 1000); // 30 minutos
+  }
+  function cerrarSesionPorInactividad() {
+    alert("Sesión cerrada por inactividad.");
+    sessionStorage.clear();
+    window.location.href = "usuario-login.html";
+  }
+  ["click", "mousemove", "keypress", "scroll"].forEach(evt => {
+    document.addEventListener(evt, reiniciarTemporizador);
+  });
+  reiniciarTemporizador();
   </script>
 
   <style>

@@ -6,11 +6,11 @@
     "start": "node server.js"
   },
   "dependencies": {
-    "express": "^4.18.2",
-    "sqlite3": "^5.1.6",
+    "body-parser": "^1.20.3",
+    "express": "^4.21.2",
+    "fs-extra": "^11.3.1",
     "moment-timezone": "^0.5.48",
-    "fs-extra": "^11.2.0",
-    "node-cron": "^4.0.7",
-    "body-parser": "^1.20.2"
+    "node-cron": "^4.2.1",
+    "sqlite3": "^5.1.7"
   }
 }

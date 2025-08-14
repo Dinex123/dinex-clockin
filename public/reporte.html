@@ -68,11 +68,49 @@
       margin-right: 10px;
     }
     #mensaje-reporte {
-      text-align: center;
-      font-weight: bold;
-      color: red;
-      margin-top: 10px;
-    }
+  text-align: center;
+  font-weight: bold;
+  color: red;
+  margin-top: 10px;
+}
+
+/* 🔴 Resaltado para fuera de geocerca */
+.fuera-geo {
+  background: #ffe6e6; /* Rojo suave */
+}
+.fuera-geo:hover {
+  background: #ffd6d6; /* Un poco más intenso al pasar el mouse */
+}
+.resumen-geo{
+  width:90%;
+  margin:10px auto 0 auto;
+  display:flex;
+  gap:10px;
+  align-items:center;
+  justify-content:flex-start;
+  font-size:14px;
+}
+.chip{
+  display:inline-block;
+  padding:6px 10px;
+  border-radius:999px;
+  font-weight:600;
+}
+.chip.ok{
+  background:#e7f7e7;
+  color:#167c16;      /* verde */
+  border:1px solid #bfe6bf;
+}
+.chip.warn{
+  background:#ffe6e6;
+  color:#b01919;      /* rojo */
+  border:1px solid #ffc2c2;
+}
+.chip.neutral{
+  background:#eef2f7;
+  color:#3c4758;      /* gris */
+  border:1px solid #d8dee6;
+}
   </style>
 </head>
 <body>
@@ -123,6 +161,19 @@
 
       datosGlobal = data;
 
+      // —— Resumen geocerca (cuentas)
+const dentro = data.filter(r => r.insideGeofence === true).length;
+const fuera  = data.filter(r => r.insideGeofence === false).length;
+const sinDato = data.filter(r => r.insideGeofence !== true && r.insideGeofence !== false).length;
+
+let resumen = `
+  <div class="resumen-geo">
+    <span class="chip ok">✔ Dentro de rango: ${dentro}</span>
+    <span class="chip warn">⚠ Fuera de rango: ${fuera}</span>
+    ${sinDato ? `<span class="chip neutral">Sin dato: ${sinDato}</span>` : ``}
+  </div>
+`;
+
       let tabla = `
         <table class="tabla-reporte">
           <tr>
@@ -135,17 +186,24 @@
       `;
 
       data.forEach(r => {
-  const [yy, mm, dd] = r.fecha.split("-");
+  const [yy, mm, dd] = (r.fecha || '').split("-");
   const esAutomatica = r.tipo === "salida" && r.auto === true;
-  const tipoTexto = esAutomatica ? "salida (automática)" : r.tipo;
+  const tipoTexto = esAutomatica ? "salida (automática)" : (r.tipo || '');
+
+  const estadoGeo = (r.insideGeofence === true)
+  ? '(Dentro de rango)'
+  : (r.insideGeofence === false)
+    ? '(Fuera de rango)'
+    : '';
 
   tabla += `
-    <tr>
+    <tr class="${r.insideGeofence === false ? 'fuera-geo' : ''}">
       <td>${tipoTexto}</td>
       <td>${mm}/${dd}/${yy}</td>
-      <td>${r.hora}</td>
+      <td>${r.hora || ''}</td>
       <td>${r.departamento || ''}</td>
-      <td>${r.ip || ''}</td>
+      <td>${estadoGeo}</td>
+
     </tr>
   `;
 });
@@ -173,7 +231,7 @@
       totalHorasStr = `${horas}h ${minutos}m`;
       tabla += `<p style="text-align:center; font-weight:bold;">Total de horas trabajadas: ${totalHorasStr}</p>`;
 
-      cont.innerHTML = tabla;
+      cont.innerHTML = resumen + tabla;
     }
 
     function exportarExcel() {
@@ -182,14 +240,19 @@
         return;
       }
       const rows = datosGlobal.map(d => {
-  const [y, m, d2] = d.fecha.split('-');
-  const tipoTexto = d.tipo === "salida" && d.auto === true ? "salida (automática)" : d.tipo;
+  const [y, m, d2] = (d.fecha || '').split('-');
+  const tipoTexto = d.tipo === "salida" && d.auto === true ? "salida (automática)" : (d.tipo || '');
+  const estadoGeo = (d.insideGeofence === true)
+  ? '(Dentro de rango)'
+  : (d.insideGeofence === false)
+    ? '(Fuera de rango)'
+    : '';
   return {
     Acción       : tipoTexto,
     Fecha        : `${m}/${d2}/${y}`,
-    Hora         : d.hora,
+    Hora         : d.hora || '',
     Departamento : d.departamento || '',
-    IP           : d.ip || ''
+    IP           : estadoGeo
   };
 });
       rows.push({});
@@ -229,9 +292,15 @@
 
         const cols = ["Acción", "Fecha", "Hora", "Departamento", "IP"];
         const filas = datosGlobal.map(d => {
-  const [y, m, d2] = d.fecha.split('-');
-  const tipoTexto = d.tipo === "salida" && d.auto === true ? "salida (automática)" : d.tipo;
-  return [tipoTexto, `${m}/${d2}/${y}`, d.hora, d.departamento || '', d.ip || ''];
+  const [y, m, d2] = (d.fecha || '').split('-');
+  const tipoTexto = d.tipo === "salida" && d.auto === true ? "salida (automática)" : (d.tipo || '');
+  const estadoGeo = (d.insideGeofence === true)
+  ? '(Dentro de rango)'
+  : (d.insideGeofence === false)
+    ? '(Fuera de rango)'
+    : '';
+  return [tipoTexto, `${m}/${d2}/${y}`, d.hora || '', d.departamento || '', estadoGeo
+];
 });
         filas.push(['','','','','']);
         filas.push(['Total horas','', totalHorasStr,'','']);
