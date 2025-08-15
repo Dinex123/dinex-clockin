@@ -81,105 +81,130 @@
     let mapaDepartamentos = {};
 
     window.addEventListener("DOMContentLoaded", async () => {
-      const res = await fetch("/api/empleados");
-      const users = await res.json();
-      users.forEach(u => {
-        mapaDepartamentos[u.usuario] = u.departamento;
-      });
+      try {
+        const res = await fetch("/api/empleados");
+        const users = await res.json();
+        users.forEach(u => {
+          mapaDepartamentos[u.usuario] = u.departamento;
+        });
 
-      // ✅ Establecer límites de fecha (hoy y hace 30 días)
-      const hoy = new Date();
-      const maxFecha = hoy.toISOString().split('T')[0];
-      const hace30 = new Date(hoy.getTime() - 30 * 24 * 60 * 60 * 1000);
-      const minFecha = hace30.toISOString().split('T')[0];
+        // ✅ Límites de fecha: hoy y hace 30 días
+        const hoy = new Date();
+        const maxFecha = hoy.toISOString().split('T')[0];
+        const hace30 = new Date(hoy.getTime() - 30 * 24 * 60 * 60 * 1000);
+        const minFecha = hace30.toISOString().split('T')[0];
 
-      const fechaInput = document.getElementById("fechaManual");
-      fechaInput.setAttribute("max", maxFecha);
-      fechaInput.setAttribute("min", minFecha);
+        const fechaInput = document.getElementById("fechaManual");
+        fechaInput.setAttribute("max", maxFecha);
+        fechaInput.setAttribute("min", minFecha);
+      } catch (err) {
+        console.error("Error cargando empleados:", err);
+      }
     });
 
     document.getElementById("usuarioManual").addEventListener("input", () => {
       const usuario = document.getElementById("usuarioManual").value.trim();
-      const depto = mapaDepartamentos[usuario];
-      document.getElementById("departamento").value = depto || "";
+      document.getElementById("departamento").value = mapaDepartamentos[usuario] || "";
     });
 
     async function buscar() {
       const u = document.getElementById("usuario").value.trim();
-      if (!u) { alert("Ingresa un usuario"); return; }
-      const res  = await fetch("/api/reporte?usuario=" + encodeURIComponent(u));
-      const data = await res.json();
-      const cont = document.getElementById("resultado");
-      if (!data.length) {
-        cont.innerHTML = "<p style='text-align:center;'>No hay registros para este usuario.</p>";
+      if (!u) {
+        alert("Ingresa un usuario");
         return;
       }
-      let html = `<table><tr>
-        <th>Acción</th><th>Fecha</th><th>Hora</th><th>IP</th><th>Editar</th><th>Eliminar</th>
-      </tr>`;
-      data.forEach((r,i)=>{
-        html += `<tr>
-          <td><input id="tipo${i}" value="${r.tipo}"></td>
-          <td><input type="date" id="fecha${i}" value="${r.fecha}"></td>
-          <td><input type="time" id="hora${i}" value="${r.hora}"></td>
-          <td>${r.ip}</td>
-          <td><button onclick="guardar('${u}',${i})" class="boton">Guardar</button></td>
-          <td><button onclick="borrar('${u}',${i})" class="boton danger">Eliminar</button></td>
-        </tr>`;
-      });
-      html += `</table>`;
-      cont.innerHTML = html;
+      try {
+        const res = await fetch("/api/reporte?usuario=" + encodeURIComponent(u));
+        const data = await res.json();
+        const cont = document.getElementById("resultado");
+
+        if (!data.length) {
+          cont.innerHTML = "<p style='text-align:center;'>No hay registros para este usuario.</p>";
+          return;
+        }
+
+        let html = `<table>
+          <tr>
+            <th>Acción</th><th>Fecha</th><th>Hora</th><th>IP</th><th>Editar</th><th>Eliminar</th>
+          </tr>`;
+        data.forEach((r, i) => {
+          html += `<tr>
+            <td><input id="tipo${i}" value="${r.tipo}"></td>
+            <td><input type="date" id="fecha${i}" value="${r.fecha}"></td>
+            <td><input type="time" id="hora${i}" value="${r.hora}"></td>
+            <td>${r.ip}</td>
+            <td><button onclick="guardar('${u}',${i})" class="boton">Guardar</button></td>
+            <td><button onclick="borrar('${u}',${i})" class="boton danger">Eliminar</button></td>
+          </tr>`;
+        });
+        html += `</table>`;
+        cont.innerHTML = html;
+      } catch (err) {
+        console.error("Error buscando registros:", err);
+      }
     }
 
     async function guardar(usuario, index) {
-      const tipo  = document.getElementById(`tipo${index}`).value;
-      const fecha = document.getElementById(`fecha${index}`).value;
-      const hora  = document.getElementById(`hora${index}`).value;
-      const res = await fetch("/api/corregir-hora", {
-        method:"POST", headers:{"Content-Type":"application/json"},
-        body: JSON.stringify({ usuario, index, tipo, fecha, hora })
-      });
-      const j = await res.json();
-      alert(j.success ? "Registro actualizado" : "Error al actualizar");
-      if (j.success) buscar();
+      try {
+        const tipo = document.getElementById(`tipo${index}`).value;
+        const fecha = document.getElementById(`fecha${index}`).value;
+        const hora = document.getElementById(`hora${index}`).value;
+
+        const res = await fetch("/api/corregir-hora", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ usuario, index, tipo, fecha, hora })
+        });
+        const j = await res.json();
+        alert(j.success ? "Registro actualizado" : "Error al actualizar");
+        if (j.success) buscar();
+      } catch (err) {
+        console.error("Error guardando registro:", err);
+      }
     }
 
     async function borrar(usuario, index) {
       if (!confirm("¿Eliminar este registro?")) return;
-      const res = await fetch("/api/borrar-marcaje", {
-        method:"DELETE", headers:{"Content-Type":"application/json"},
-        body: JSON.stringify({ usuario, index })
-      });
-      const j = await res.json();
-      alert(j.success ? "Registro eliminado" : "Error al eliminar");
-      if (j.success) buscar();
+      try {
+        const res = await fetch("/api/borrar-marcaje", {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ usuario, index })
+        });
+        const j = await res.json();
+        alert(j.success ? "Registro eliminado" : "Error al eliminar");
+        if (j.success) buscar();
+      } catch (err) {
+        console.error("Error eliminando registro:", err);
+      }
     }
 
-    document.getElementById("form-agregar-marcaje")
-      .addEventListener("submit", async function(e) {
-        e.preventDefault();
+    document.getElementById("form-agregar-marcaje").addEventListener("submit", async function (e) {
+      e.preventDefault();
 
-        const fechaInput = document.getElementById("fechaManual").value;
-        const fechaSeleccionada = new Date(fechaInput);
-        const hoy = new Date();
-        hoy.setHours(0, 0, 0, 0); // quitar horas
+      const fechaInput = document.getElementById("fechaManual").value;
+      const fechaSeleccionada = new Date(fechaInput);
+      const hoy = new Date();
+      hoy.setHours(0, 0, 0, 0);
 
-        if (fechaSeleccionada > hoy) {
-          document.getElementById("mensaje").textContent = "No puedes registrar una fecha futura.";
-          document.getElementById("mensaje").style.color = "red";
-          return;
-        }
+      const msgEl = document.getElementById("mensaje");
 
-        const usuario      = document.getElementById("usuarioManual").value.trim();
-        const departamento = document.getElementById("departamento").value.trim();
-        const fecha        = fechaInput;
-        const hora         = document.getElementById("horaManual").value;
-        const tipo         = document.getElementById("tipoManual").value;
-        const msgEl        = document.getElementById("mensaje");
+      if (fechaSeleccionada > hoy) {
+        msgEl.textContent = "No puedes registrar una fecha futura.";
+        msgEl.style.color = "red";
+        return;
+      }
 
+      const usuario = document.getElementById("usuarioManual").value.trim();
+      const departamento = document.getElementById("departamento").value.trim();
+      const hora = document.getElementById("horaManual").value;
+      const tipo = document.getElementById("tipoManual").value;
+
+      try {
         const res = await fetch("/api/agregar-marcaje", {
-          method:"POST", headers:{"Content-Type":"application/json"},
-          body:JSON.stringify({ usuario, departamento, tipo, fecha, hora })
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ usuario, departamento, tipo, fecha: fechaInput, hora })
         });
         const json = await res.json();
         msgEl.textContent = json.mensaje;
@@ -188,7 +213,12 @@
           document.getElementById("usuario").value = usuario;
           buscar();
         }
-      });
+      } catch (err) {
+        msgEl.textContent = "Error al agregar registro.";
+        msgEl.style.color = "red";
+        console.error(err);
+      }
+    });
   </script>
 </body>
 </html>

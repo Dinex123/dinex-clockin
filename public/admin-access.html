@@ -10,7 +10,7 @@
     <img src="logo-dinex.png" alt="Logo DinEX" class="logo">
     <h1>Acceso Administrador</h1>
 
-    <form class="formulario" onsubmit="event.preventDefault(); acceder();">
+    <form class="formulario" id="adminLoginForm">
       <div class="campo">
         <label for="usuario">Usuario:</label>
         <input type="text" id="usuario" required>
@@ -28,30 +28,43 @@
   </div>
 
   <script>
-    async function acceder() {
+    const form = document.getElementById('adminLoginForm');
+    const msg = document.getElementById('mensaje');
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+
       const usuario = document.getElementById('usuario').value.trim();
       const clave   = document.getElementById('clave').value.trim();
 
       if (!usuario || !clave) {
-        document.getElementById('mensaje').textContent = "Por favor completa ambos campos.";
+        msg.textContent = "Por favor completa ambos campos.";
         return;
       }
 
-      const res = await fetch('/api/admin-login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username: usuario, password: clave })
-      });
+      msg.style.color = "#333";
+      msg.textContent = "Verificando credenciales...";
 
-      const data = await res.json();
-      if (data.success) {
-        sessionStorage.setItem("admin", usuario);
-        window.location.href = 'admin.html';
-      } else {
-        document.getElementById('mensaje').textContent = "Credenciales incorrectas.";
+      try {
+        const data = await postJSON('/api/admin-login', { username: usuario, password: clave });
+
+        if (data && data.success) {
+          sessionStorage.setItem("admin", usuario);
+          window.location.href = 'admin.html';
+        } else {
+          msg.style.color = "red";
+          msg.textContent = "Credenciales incorrectas.";
+        }
+      } catch (err) {
+        console.error(err);
+        msg.style.color = "red";
+        msg.textContent = `Error: ${err.message || 'No se pudo iniciar sesión.'}`;
       }
-    }
+    });
   </script>
+
+  <!-- Helpers comunes -->
+  <script src="common.js"></script>
 
   <style>
     .contenedor {

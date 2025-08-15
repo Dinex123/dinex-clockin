@@ -15,143 +15,115 @@
       <button onclick="registrar('salida_lunch')" class="boton">Lunch Out</button>
       <button onclick="registrar('entrada_lunch')" class="boton">Lunch In</button>
       <button onclick="registrar('salida')" class="boton">Salida</button>
-      <!-- Antes era un enlace a index.html. Ahora cerramos sesión del lado del cliente. -->
-      <button type="button" class="boton danger" onclick="cerrarSesion()">Cerrar Sesión</button>
+      <!-- Cerrar sesión en el front -->
+      <button onclick="cerrarSesion()" class="boton danger">Cerrar Sesión</button>
     </div>
 
     <p id="mensaje" style="margin-top: 20px;"></p>
   </div>
 
-  <!-- 1) Cargamos utilidades compartidas -->
+  <!-- Helpers globales (postJSON, cerrarSesion, mostrarMensaje) -->
   <script src="common.js"></script>
 
-  <!-- 2) Lógica propia de esta página -->
   <script>
-  // ⚙️ Opciones de geolocalización
-  const GEO_OPTS = { enableHighAccuracy: false, timeout: 8000, maximumAge: 0 };
+    // ⚙️ Opciones de geolocalización
+    const GEO_OPTS = { enableHighAccuracy: false, timeout: 8000, maximumAge: 0 };
 
-  // Obtiene {lat, lng, accuracy} con una Promesa
-  function getCoords() {
-    return new Promise((resolve, reject) => {
-      if (!("geolocation" in navigator)) {
-        return reject(new Error("Tu navegador no soporta geolocalización."));
-      }
-      navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          const { latitude, longitude, accuracy } = pos.coords;
-          resolve({ lat: latitude, lng: longitude, accuracy });
-        },
-        (err) => {
-          if (err.code === 1) {
-            reject(new Error("Debes permitir el acceso a tu ubicación para marcar."));
-          } else if (err.code === 2) {
-            reject(new Error("Ubicación no disponible. Revisa conexión/GPS y vuelve a intentar."));
-          } else {
-            reject(new Error("La solicitud de ubicación tardó demasiado. Intenta nuevamente."));
-          }
-        },
-        GEO_OPTS
-      );
-    });
-  }
-
-  // Deshabilita botones mientras se marca para evitar dobles clics
-  function setBotonesEnabled(enabled) {
-    document.querySelectorAll(".botones .boton").forEach(b => b.disabled = !enabled);
-  }
-
-  async function registrar(tipo) {
-    const mensajeEl = document.getElementById("mensaje");
-    const usuario = sessionStorage.getItem("usuario");
-    const departamento = sessionStorage.getItem("departamento");
-
-    if (!usuario) {
-      alert("Sesión expirada. Vuelve a iniciar sesión.");
-      window.location.href = "usuario-login.html";
-      return;
+    // Obtiene {lat, lng, accuracy}
+    function getCoords() {
+      return new Promise((resolve, reject) => {
+        if (!("geolocation" in navigator)) {
+          return reject(new Error("Tu navegador no soporta geolocalización."));
+        }
+        navigator.geolocation.getCurrentPosition(
+          (pos) => {
+            const { latitude, longitude, accuracy } = pos.coords;
+            resolve({ lat: latitude, lng: longitude, accuracy });
+          },
+          (err) => {
+            if (err.code === 1) {
+              reject(new Error("Debes permitir el acceso a tu ubicación para marcar."));
+            } else if (err.code === 2) {
+              reject(new Error("Ubicación no disponible. Revisa conexión/GPS y vuelve a intentar."));
+            } else {
+              reject(new Error("La solicitud de ubicación tardó demasiado. Intenta nuevamente."));
+            }
+          },
+          GEO_OPTS
+        );
+      });
     }
 
-    try {
-      setBotonesEnabled(false);
-      mensajeEl.style.color = "#333";
-      mensajeEl.textContent = "Obteniendo ubicación…";
+    // Deshabilita botones mientras se marca
+    function setBotonesEnabled(enabled) {
+      document.querySelectorAll(".botones .boton").forEach(b => b.disabled = !enabled);
+    }
 
-      // 1) Pedir ubicación
-      const location = await getCoords();
+    async function registrar(tipo) {
+      const mensajeEl = document.getElementById("mensaje");
+      const usuario = sessionStorage.getItem("usuario");
+      const departamento = sessionStorage.getItem("departamento");
 
-      mensajeEl.textContent = "Registrando marcaje…";
-
-      // 2) Enviar al servidor usando postJSON (desde common.js)
-      const data = await postJSON("/api/marcar", { usuario, tipo, departamento, location });
-
-      if (data.success === false) {
-        throw new Error(data.mensaje || "No se pudo registrar el marcaje.");
+      if (!usuario) {
+        alert("Sesión expirada. Vuelve a iniciar sesión.");
+        window.location.href = "usuario-login.html";
+        return;
       }
 
-      mensajeEl.style.color = "green";
-      mensajeEl.textContent = data.mensaje || "Marcaje registrado correctamente.";
+      try {
+        setBotonesEnabled(false);
+        mensajeEl.style.color = "#333";
+        mensajeEl.textContent = "Obteniendo ubicación…";
 
-    } catch (e) {
-      console.error(e);
-      mensajeEl.style.color = "red";
-      mensajeEl.textContent = e.message || "Error al registrar el marcaje.";
-    } finally {
-      setBotonesEnabled(true);
+        // 1) pedir ubicación
+        const location = await getCoords();
+
+        mensajeEl.textContent = "Registrando marcaje…";
+
+        // 2) enviar usando postJSON (de common.js)
+        const data = await postJSON("/api/marcar", { usuario, tipo, departamento, location });
+
+        if (!data || data.success === false) {
+          throw new Error((data && data.mensaje) || "No se pudo registrar el marcaje.");
+        }
+
+        mensajeEl.style.color = "green";
+        mensajeEl.textContent = data.mensaje || "Marcaje registrado correctamente.";
+      } catch (e) {
+        console.error(e);
+        mensajeEl.style.color = "red";
+        mensajeEl.textContent = e.message || "Error al registrar el marcaje.";
+      } finally {
+        setBotonesEnabled(true);
+      }
     }
-  }
 
-  // ⏳ SISTEMA DE CIERRE POR INACTIVIDAD (30 MINUTOS)
-  let tiempoInactividad;
-  function reiniciarTemporizador() {
-    clearTimeout(tiempoInactividad);
-    tiempoInactividad = setTimeout(() => {
-      alert("Sesión cerrada por inactividad.");
-      cerrarSesion(); // usa la función global de common.js
-    }, 30 * 60 * 1000); // 30 minutos
-  }
-
-  ["click", "mousemove", "keypress", "scroll", "touchstart"].forEach(evt => {
-    document.addEventListener(evt, reiniciarTemporizador, { passive: true });
-  });
-  reiniciarTemporizador();
+    // ⏳ Cierre por inactividad (30 min)
+    let tiempoInactividad;
+    function reiniciarTemporizador() {
+      clearTimeout(tiempoInactividad);
+      tiempoInactividad = setTimeout(() => {
+        alert("Sesión cerrada por inactividad.");
+        sessionStorage.clear();
+        window.location.href = "usuario-login.html";
+      }, 30 * 60 * 1000);
+    }
+    ["click", "mousemove", "keypress", "scroll"].forEach(evt =>
+      document.addEventListener(evt, reiniciarTemporizador)
+    );
+    reiniciarTemporizador();
   </script>
 
   <style>
     .boton.danger { background: #ea1902; }
     .botones { text-align: center; margin: 20px 0; }
     .boton {
-      background-color: #ec008c;
-      color: white;
-      border: none;
-      padding: 8px 16px;
-      margin: 5px;
-      border-radius: 5px;
-      cursor: pointer;
+      background-color: #ec008c; color: white; border: none;
+      padding: 8px 16px; margin: 5px; border-radius: 5px; cursor: pointer;
       transition: background 0.3s ease;
     }
     .boton:hover { background-color: #c60074; }
-
-    table.dinex-table {
-      width: 90%;
-      margin: 20px auto;
-      border-collapse: collapse;
-      font-size: 14px;
-      text-align: center;
-      box-shadow: 0 0 5px rgba(0,0,0,0.1);
-    }
-    table.dinex-table th {
-      background-color: #ec008c;
-      color: white;
-      padding: 10px;
-      font-weight: bold;
-    }
-    table.dinex-table td { padding: 8px; }
-    table.dinex-table tr:nth-child(even) { background-color: #fce8f3; }
-    table.dinex-table tr:hover { background-color: #fff0fa; }
-
     h1 { text-align: center; margin-bottom: 10px; color: #85b200; }
-    label { margin: 0 10px; }
-
     .contenedor { max-width: 1100px; margin: auto; padding: 20px; }
     .logo { display: block; margin: 0 auto 10px auto; max-width: 220px; }
   </style>

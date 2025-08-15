@@ -4,9 +4,12 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Usuarios Inactivos</title>
+
+  <!-- Exportar a PDF / Excel -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
   <style>
     body {
       font-family: 'Segoe UI', sans-serif;
@@ -42,15 +45,13 @@
       border-radius: 5px;
       cursor: pointer;
     }
-    .dropbtn:hover {
-      background-color: #b10077;
-    }
+    .dropbtn:hover { background-color: #b10077; }
     .dropdown-content {
       display: none;
       position: absolute;
       right: 0;
       background-color: white;
-      min-width: 160px;
+      min-width: 180px;
       box-shadow: 0px 8px 16px rgba(0,0,0,0.2);
       z-index: 1;
       border-radius: 6px;
@@ -63,12 +64,8 @@
       display: block;
       font-size: 15px;
     }
-    .dropdown-content a:hover {
-      background-color: #f1f1f1;
-    }
-    .dropdown:hover .dropdown-content {
-      display: block;
-    }
+    .dropdown-content a:hover { background-color: #f1f1f1; }
+    .dropdown:hover .dropdown-content { display: block; }
 
     .container {
       max-width: 1200px;
@@ -90,7 +87,6 @@
       border-collapse: collapse;
       margin-bottom: 2rem;
     }
-
     th {
       background-color: #287fba;
       color: white;
@@ -98,17 +94,12 @@
       text-align: left;
       font-weight: bold;
     }
-
     td {
       padding: 14px;
       border-bottom: 1px solid #eee;
       vertical-align: middle;
     }
-
-    tr:hover {
-      background-color: #f9f9f9;
-      transition: background 0.3s ease;
-    }
+    tr:hover { background-color: #f9f9f9; transition: background 0.3s ease; }
 
     .badge {
       padding: 6px 12px;
@@ -117,13 +108,13 @@
       font-weight: 600;
       display: inline-block;
     }
-    .badge-eliminado {
-      background-color: #f44336;
-      color: white;
-    }
-    .badge-desactivado {
-      background-color: #ffc107;
-      color: #333;
+    .badge-eliminado { background-color: #f44336; color: white; }
+    .badge-desactivado { background-color: #ffc107; color: #333; }
+
+    .info {
+      text-align: center;
+      color: #666;
+      margin: 10px 0 30px;
     }
   </style>
 </head>
@@ -141,6 +132,8 @@
   </div>
 
   <div class="container">
+    <div class="info" id="infoTop"></div>
+
     <table id="tabla-inactivos">
       <thead>
         <tr>
@@ -155,6 +148,7 @@
     </table>
 
     <h2>Registro de Marcación</h2>
+    <div class="info" id="infoBitacora">Haz clic en un empleado para ver su bitácora.</div>
     <table id="tabla-bitacora">
       <thead>
         <tr>
@@ -168,16 +162,24 @@
     </table>
   </div>
 
+  <!-- Logo oculto para incrustar en PDF -->
   <img id="logoDinex" src="logo-dinex.png" style="display:none;" />
 
   <script>
     let dataInactivos = [];
     let nombreEmpleadoActual = "";
 
-    // ✅ NUEVA FUNCIÓN para cambiar formato de fecha
+    // Formatea ISO / YYYY-MM-DD a MM/DD/YYYY; si no hay valor, devuelve '-'
     function formatearFecha(fechaISO) {
       if (!fechaISO) return '-';
+      // Si viene "YYYY-MM-DD" lo tratamos como local para no desfasar
+      const partes = /^(\d{4})-(\d{2})-(\d{2})$/.exec(fechaISO);
+      if (partes) {
+        const [_, y, m, d] = partes;
+        return `${m}/${d}/${y}`;
+      }
       const fecha = new Date(fechaISO);
+      if (isNaN(fecha)) return '-';
       const mes = String(fecha.getMonth() + 1).padStart(2, '0');
       const dia = String(fecha.getDate()).padStart(2, '0');
       const anio = fecha.getFullYear();
@@ -185,34 +187,65 @@
     }
 
     async function cargarEmpleadosInactivos() {
-      const res = await fetch('http://localhost:3000/api/empleados-inactivos');
-      dataInactivos = await res.json();
+      const infoTop = document.getElementById('infoTop');
       const tbody = document.querySelector('#tabla-inactivos tbody');
       tbody.innerHTML = '';
-      dataInactivos.forEach((emp, index) => {
-        const estadoClase = emp.estado === "Eliminado" ? "badge badge-eliminado" : "badge badge-desactivado";
-        const tr = document.createElement('tr');
-        tr.innerHTML = `
-          <td>${emp.nombre}</td>
-          <td>${emp.departamento}</td>
-          <td><span class="${estadoClase}">${emp.estado}</span></td>
-          <td>${formatearFecha(emp.fecha_creacion)}</td>
-          <td>${formatearFecha(emp.fecha_baja)}</td>
-        `;
-        tr.style.cursor = 'pointer';
-        tr.addEventListener('click', () => mostrarBitacora(index));
-        tbody.appendChild(tr);
-      });
+      nombreEmpleadoActual = '';
+      document.querySelector('#tabla-bitacora tbody').innerHTML = '';
+      document.getElementById('infoBitacora').textContent = 'Haz clic en un empleado para ver su bitácora.';
+
+      try {
+        const res = await fetch('/api/empleados-inactivos');
+        if (!res.ok) throw new Error('No se pudo cargar la información.');
+        dataInactivos = await res.json();
+
+        if (!Array.isArray(dataInactivos) || dataInactivos.length === 0) {
+          infoTop.textContent = 'No hay usuarios inactivos para mostrar.';
+          return;
+        }
+        infoTop.textContent = `Total de usuarios inactivos: ${dataInactivos.length}`;
+
+        dataInactivos.forEach((emp, index) => {
+          const estadoClase = emp.estado === "Eliminado"
+            ? "badge badge-eliminado"
+            : "badge badge-desactivado";
+
+          const tr = document.createElement('tr');
+          tr.innerHTML = `
+            <td>${emp.nombre}</td>
+            <td>${emp.departamento}</td>
+            <td><span class="${estadoClase}">${emp.estado}</span></td>
+            <td>${formatearFecha(emp.fecha_creacion)}</td>
+            <td>${formatearFecha(emp.fecha_baja)}</td>
+          `;
+          tr.style.cursor = 'pointer';
+          tr.addEventListener('click', () => mostrarBitacora(index));
+          tbody.appendChild(tr);
+        });
+      } catch (err) {
+        console.error(err);
+        infoTop.textContent = 'Error al cargar los empleados inactivos.';
+      }
     }
 
     function mostrarBitacora(index) {
-      const registros = dataInactivos[index].registros;
       const tbody = document.querySelector('#tabla-bitacora tbody');
       tbody.innerHTML = '';
-      nombreEmpleadoActual = dataInactivos[index].nombre;
+      const infoBit = document.getElementById('infoBitacora');
+
+      const empleado = dataInactivos[index];
+      nombreEmpleadoActual = empleado.nombre;
+      const registros = Array.isArray(empleado.registros) ? empleado.registros : [];
+
+      if (registros.length === 0) {
+        infoBit.textContent = `No hay registros para ${nombreEmpleadoActual}.`;
+        return;
+      }
+      infoBit.textContent = `Bitácora de ${nombreEmpleadoActual}: ${registros.length} registros.`;
+
       registros.forEach(reg => {
         const tr = document.createElement('tr');
-        const fechaHora = `${formatearFecha(reg.fecha)} ${reg.hora}`;
+        const fechaHora = `${formatearFecha(reg.fecha)} ${reg.hora || ''}`.trim();
         tr.innerHTML = `
           <td>${fechaHora}</td>
           <td>${reg.tipo}</td>
@@ -227,6 +260,8 @@
       if (!nombreEmpleadoActual) return alert("Selecciona un empleado.");
       const { jsPDF } = window.jspdf;
       const doc = new jsPDF();
+
+      // Logo a Base64
       const img = document.getElementById('logoDinex');
       if (!img.complete) await new Promise(resolve => img.onload = resolve);
       const canvas = document.createElement('canvas');
@@ -234,16 +269,25 @@
       canvas.height = img.naturalHeight;
       canvas.getContext('2d').drawImage(img, 0, 0);
       const logoBase64 = canvas.toDataURL('image/png');
+
       doc.addImage(logoBase64, 'PNG', 150, 10, 40, 15);
       doc.setFontSize(12);
       doc.text(`Record del Empleado: ${nombreEmpleadoActual}`, 14, 20);
+
       const filas = [];
       document.querySelectorAll("#tabla-bitacora tbody tr").forEach(tr => {
         const celdas = [...tr.children].map(td => td.textContent.trim());
         filas.push(celdas);
       });
-      doc.autoTable({ head: [["Fecha y Hora", "Tipo de Marcaje", "Dirección IP", "Departamento"]], body: filas, startY: 30 });
-      doc.save(`bitacora_${nombreEmpleadoActual.replaceAll(" ", "_").toLowerCase()}.pdf`);
+
+      doc.autoTable({
+        head: [["Fecha y Hora", "Tipo de Marcaje", "Dirección IP", "Departamento"]],
+        body: filas,
+        startY: 30
+      });
+
+      const nombreArchivo = `bitacora_${nombreEmpleadoActual.replace(/ /g, "_").toLowerCase()}.pdf`;
+      doc.save(nombreArchivo);
     }
 
     function exportarBitacoraExcel() {
@@ -251,8 +295,8 @@
       const tabla = document.getElementById("tabla-bitacora");
       const wb = XLSX.utils.book_new();
       const ws = XLSX.utils.table_to_sheet(tabla);
-      XLSX.utils.book_append_sheet(wb, ws, "Bitácora");
-      const nombreArchivo = `bitacora_${nombreEmpleadoActual.replaceAll(" ", "_").toLowerCase()}.xlsx`;
+      XLSX.utils.book_append_sheet(wb, ws, "Bitacora");
+      const nombreArchivo = `bitacora_${nombreEmpleadoActual.replace(/ /g, "_").toLowerCase()}.xlsx`;
       XLSX.writeFile(wb, nombreArchivo);
     }
 

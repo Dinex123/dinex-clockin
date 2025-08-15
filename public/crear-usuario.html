@@ -4,17 +4,62 @@
   <meta charset="UTF-8">
   <title>Crear Usuario</title>
   <link rel="stylesheet" href="style.css">
+  <style>
+    .contenedor {
+      max-width: 400px;
+      margin: auto;
+      padding: 30px 20px;
+    }
+    .logo {
+      max-width: 200px;
+      display: block;
+      margin: 0 auto 20px auto;
+    }
+    h1 {
+      text-align: center;
+      margin-bottom: 30px;
+      color: #85b100;
+    }
+    form {
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+    }
+    input, select {
+      padding: 8px;
+      border: 1px solid #ccc;
+      border-radius: 5px;
+      font-size: 14px;
+    }
+    .boton {
+      background-color: #ec008c;
+      color: white;
+      border: none;
+      padding: 10px;
+      border-radius: 5px;
+      cursor: pointer;
+      text-align: center;
+    }
+    .boton:hover {
+      background-color: #c60074;
+    }
+    #mensaje {
+      text-align: center;
+      font-weight: bold;
+      margin-top: 5px;
+    }
+  </style>
 </head>
 <body>
   <div class="contenedor">
     <img src="logo-dinex.png" alt="Logo DinEX" class="logo">
     <h1>Crear Nuevo Usuario</h1>
-    <form id="crearForm">
-      <input type="text" id="nombre" placeholder="Nombre completo" required><br><br>
-      <input type="text" id="usuario" placeholder="Usuario" required><br><br>
-      <input type="password" id="contrasena" placeholder="Contraseña" required><br><br>
 
-      <!-- Campo Departamento convertido en select -->
+    <form id="crearForm">
+      <input type="text" id="nombre" placeholder="Nombre completo" required>
+      <input type="text" id="usuario" placeholder="Usuario" required>
+      <input type="password" id="contrasena" placeholder="Contraseña" required>
+
       <select id="departamento" required>
         <option value="" disabled selected>Selecciona un departamento</option>
         <option value="Corporativo">Corporativo</option>
@@ -24,11 +69,11 @@
         <option value="Sucursales">Sucursales</option>
         <option value="Departamento de IT">Departamento de IT</option>
       </select>
-      <br><br>
 
       <button type="submit" class="boton">Crear Usuario</button>
       <p id="mensaje"></p>
     </form>
+
     <br>
     <a href="admin.html" class="boton">Volver al Panel</a>
   </div>
@@ -36,35 +81,42 @@
   <script>
     document.getElementById('crearForm').addEventListener('submit', async function(e) {
       e.preventDefault();
+
       const nombre       = document.getElementById('nombre').value.trim();
       const usuario      = document.getElementById('usuario').value.trim();
-      const contrasena   = document.getElementById('contrasena').value;
+      const contrasena   = document.getElementById('contrasena').value.trim();
       const departamento = document.getElementById('departamento').value;
       const mensajeEl    = document.getElementById('mensaje');
 
-      // ➕ Generar fecha de creación automáticamente
+      if (!nombre || !usuario || !contrasena || !departamento) {
+        mensajeEl.style.color = 'red';
+        mensajeEl.textContent = 'Por favor completa todos los campos.';
+        return;
+      }
+
+      // ➕ Generar fecha de creación
       const fecha_creacion = new Date().toISOString();
 
-      const response = await fetch('/api/crear-usuario', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          nombre, 
-          usuario, 
-          contrasena, 
-          departamento, 
-          fecha_creacion // ➕ Enviamos la fecha
-        })
-      });
+      try {
+        const response = await fetch('/api/crear-usuario', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ nombre, usuario, contrasena, departamento, fecha_creacion })
+        });
 
-      const result = await response.json();
-      if (result.success) {
-        mensajeEl.style.color = 'green';
-        mensajeEl.textContent = 'Usuario creado exitosamente';
-        this.reset();
-      } else {
+        const result = await response.json();
+        if (result.success) {
+          mensajeEl.style.color = 'green';
+          mensajeEl.textContent = 'Usuario creado exitosamente';
+          this.reset();
+        } else {
+          mensajeEl.style.color = 'red';
+          mensajeEl.textContent = result.mensaje || 'El usuario ya está registrado';
+        }
+      } catch (err) {
         mensajeEl.style.color = 'red';
-        mensajeEl.textContent = result.mensaje || 'El usuario ya está registrado';
+        mensajeEl.textContent = 'Error de conexión con el servidor.';
+        console.error('Error al crear usuario:', err);
       }
     });
   </script>

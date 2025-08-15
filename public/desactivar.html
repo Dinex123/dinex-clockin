@@ -4,38 +4,101 @@
   <meta charset="UTF-8">
   <title>Desactivar Usuario</title>
   <link rel="stylesheet" href="style.css">
+  <style>
+    .contenedor {
+      max-width: 400px;
+      margin: auto;
+      padding: 30px 20px;
+    }
+    .logo {
+      max-width: 200px;
+      display: block;
+      margin: 0 auto 20px auto;
+    }
+    h1 {
+      text-align: center;
+      margin-bottom: 30px;
+      color: #85b100;
+    }
+    form {
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+    }
+    input {
+      padding: 8px;
+      border: 1px solid #ccc;
+      border-radius: 5px;
+      font-size: 14px;
+    }
+    .boton {
+      background-color: #ec008c;
+      color: white;
+      border: none;
+      padding: 10px;
+      border-radius: 5px;
+      cursor: pointer;
+      text-align: center;
+    }
+    .boton:hover {
+      background-color: #c60074;
+    }
+    #mensaje {
+      text-align: center;
+      font-weight: bold;
+      margin-top: 5px;
+    }
+  </style>
 </head>
 <body>
   <div class="contenedor">
     <img src="logo-dinex.png" alt="Logo DinEX" class="logo">
     <h1>Desactivar Usuario</h1>
+
     <form id="desactivarForm">
-      <input type="text" id="usuario" placeholder="Usuario a desactivar" required><br><br>
+      <input type="text" id="usuario" placeholder="Usuario a desactivar" required>
       <button type="submit" class="boton">Desactivar</button>
       <p id="mensaje"></p>
     </form>
+
     <br>
     <a href="admin.html" class="boton">Volver al Panel</a>
   </div>
+
   <script>
     document.getElementById('desactivarForm').addEventListener('submit', async function(e) {
       e.preventDefault();
-      const usuario = document.getElementById('usuario').value;
 
-      const response = await fetch('/api/desactivar-usuario', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ usuario })
-      });
-
-      const result = await response.json();
+      const usuario = document.getElementById('usuario').value.trim();
       const mensaje = document.getElementById('mensaje');
-      if (result.success) {
-        mensaje.style.color = 'green';
-        mensaje.textContent = 'Usuario desactivado exitosamente';
-      } else {
+
+      if (!usuario) {
         mensaje.style.color = 'red';
-        mensaje.textContent = 'No se encontró el usuario';
+        mensaje.textContent = 'Por favor ingresa el usuario.';
+        return;
+      }
+
+      try {
+        const response = await fetch('/api/desactivar-usuario', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ usuario })
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+          mensaje.style.color = 'green';
+          mensaje.textContent = 'Usuario desactivado exitosamente';
+          this.reset();
+        } else {
+          mensaje.style.color = 'red';
+          mensaje.textContent = result.mensaje || 'No se encontró el usuario';
+        }
+      } catch (error) {
+        console.error('Error en la solicitud:', error);
+        mensaje.style.color = 'red';
+        mensaje.textContent = 'Error de conexión con el servidor.';
       }
     });
   </script>

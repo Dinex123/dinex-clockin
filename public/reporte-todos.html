@@ -7,6 +7,80 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
+  <style>
+    .boton.danger {
+      background: #ea1902;
+    }
+
+    table {
+      width: 90%;
+      margin: 20px auto;
+      border-collapse: collapse;
+      font-size: 14px;
+      text-align: center;
+      box-shadow: 0 0 5px rgba(0,0,0,0.1);
+    }
+
+    th {
+      background-color: #0a75c2;
+      color: white;
+      padding: 10px;
+      font-weight: bold;
+    }
+
+    td {
+      padding: 8px;
+    }
+
+    tr:nth-child(even) {
+      background-color: #f8f8f8;
+    }
+
+    tr:hover {
+      background-color: #eef6ff;
+    }
+
+    h1 {
+      text-align: center;
+      margin-bottom: 10px;
+    }
+
+    .botones {
+      text-align: center;
+      margin: 20px 0;
+    }
+
+    .boton {
+      background-color: #ec008c;
+      color: white;
+      border: none;
+      padding: 8px 16px;
+      margin: 5px;
+      border-radius: 5px;
+      cursor: pointer;
+      transition: background 0.3s ease;
+    }
+
+    .boton:hover {
+      background-color: #c60074;
+    }
+
+    label {
+      margin: 0 10px;
+    }
+
+    .contenedor {
+      max-width: 1100px;
+      margin: auto;
+      padding: 20px;
+    }
+
+    .logo {
+      display: block;
+      margin: 0 auto 10px auto;
+      max-width: 220px;
+    }
+  </style>
 </head>
 <body>
   <div class="contenedor">
@@ -19,7 +93,6 @@
       <button class="boton" onclick="filtrarPorFecha()">Buscar por Fechas</button>
     </div>
 
-    <!-- NUEVO: Filtro por departamento -->
     <div style="text-align:center; margin: 10px 0;">
       <label>Departamento:
         <select id="departamento" onchange="filtrarPorDepartamento()">
@@ -32,7 +105,7 @@
       <button onclick="cargarResumen()" class="boton">Ver Todo</button>
       <button onclick="exportarResumenExcel()" class="boton">Exportar a Excel</button>
       <button onclick="exportarResumenPDF()" class="boton">Exportar a PDF</button>
-      <button onclick="window.print()" class="boton">Imprimir</button> <!-- NUEVO -->
+      <button onclick="window.print()" class="boton">Imprimir</button>
     </div>
 
     <div id="resumen" style="margin-top:20px;"></div>
@@ -54,7 +127,7 @@
         if (!usuariosRes.ok || !datosRes.ok) throw new Error('Error cargando datos');
         mapaNombres = await usuariosRes.json();
         datosTodos = await datosRes.json();
-        llenarSelectDepartamentos(); // NUEVO
+        llenarSelectDepartamentos();
         renderResumen(datosTodos);
       } catch (err) {
         alert('Error cargando información del servidor.');
@@ -84,14 +157,6 @@
         const filtrados = datosTodos.filter(r => (r.departamento || '').toLowerCase() === depto.toLowerCase());
         renderResumen(filtrados);
       }
-    }
-
-    function formatFecha(f) {
-      if (f.includes('-')) {
-        const [y,m,d] = f.split('-');
-        return `${m}/${d}/${y}`;
-      }
-      return f;
     }
 
     function filtrarPorFecha() {
@@ -179,7 +244,6 @@
         alert("No hay datos para exportar.");
         return;
       }
-
       const { jsPDF } = window.jspdf;
       const doc = new jsPDF();
       const img = new Image();
@@ -188,7 +252,6 @@
         doc.addImage(img, 'PNG', 14, 8, 50, 15);
         doc.setFontSize(14);
         doc.text('Resumen por Empleado', 70, 20);
-
         const cols = ['Nombre Completo', 'Departamento', 'Días Trabajados', 'Total de Horas'];
         const filas = resumenFinal.map(r => [
           r["Nombre Completo"],
@@ -196,92 +259,15 @@
           r["Días Trabajados"],
           r["Total de Horas"]
         ]);
-
         doc.autoTable({
           startY: 30,
           head: [cols],
           body: filas,
           styles: { fontSize: 9 }
         });
-
         doc.save('resumen-empleados.pdf');
       };
     }
   </script>
-
-  <style>
-  .boton.danger {
-    background: #ea1902;
-  }
-
-  table {
-    width: 90%;
-    margin: 20px auto;
-    border-collapse: collapse;
-    font-size: 14px;
-    text-align: center;
-    box-shadow: 0 0 5px rgba(0,0,0,0.1);
-  }
-
-  th {
-    background-color: #0a75c2;
-    color: white;
-    padding: 10px;
-    font-weight: bold;
-  }
-
-  td {
-    padding: 8px;
-  }
-
-  tr:nth-child(even) {
-    background-color: #f8f8f8;
-  }
-
-  tr:hover {
-    background-color: #eef6ff;
-  }
-
-  h1 {
-    text-align: center;
-    margin-bottom: 10px;
-  }
-
-  .botones {
-    text-align: center;
-    margin: 20px 0;
-  }
-
-  .boton {
-    background-color: #ec008c;
-    color: white;
-    border: none;
-    padding: 8px 16px;
-    margin: 5px;
-    border-radius: 5px;
-    cursor: pointer;
-    transition: background 0.3s ease;
-  }
-
-  .boton:hover {
-    background-color: #c60074;
-  }
-
-  label {
-    margin: 0 10px;
-  }
-
-  .contenedor {
-    max-width: 1100px;
-    margin: auto;
-    padding: 20px;
-  }
-
-  .logo {
-    display: block;
-    margin: 0 auto 10px auto;
-    max-width: 220px;
-  }
-  </style>
 </body>
 </html>

@@ -18,9 +18,8 @@
       cursor: pointer;
       font-size: 14px;
     }
-    .boton:hover {
-      background-color: #c60074;
-    }
+    .boton:hover { background-color: #c60074; }
+
     .tabla-reporte {
       width: 90%;
       margin: 30px auto;
@@ -39,90 +38,49 @@
       padding: 8px;
       border-bottom: 1px solid #ddd;
     }
-    .tabla-reporte tr:nth-child(even) {
-      background-color: #fdf4fb;
-    }
-    .tabla-reporte tr:hover {
-      background-color: #fae6f4;
-    }
-    .contenedor {
-      max-width: 1100px;
-      margin: auto;
-      padding: 20px;
-    }
-    .logo {
-      display: block;
-      margin: 0 auto 10px auto;
-      max-width: 220px;
-    }
-    h1 {
-      text-align: center;
-      margin-bottom: 20px;
-      color: #88a800;
-    }
+    .tabla-reporte tr:nth-child(even) { background-color: #fdf4fb; }
+    .tabla-reporte tr:hover { background-color: #fae6f4; }
+
+    .contenedor { max-width: 1100px; margin: auto; padding: 20px; }
+    .logo { display: block; margin: 0 auto 10px auto; max-width: 220px; }
+    h1 { text-align: center; margin-bottom: 20px; color: #88a800; }
+
     input[type="text"] {
-      padding: 6px 10px;
-      border: 1px solid #ccc;
-      border-radius: 4px;
-      font-size: 14px;
-      margin-right: 10px;
+      padding: 6px 10px; border: 1px solid #ccc; border-radius: 4px;
+      font-size: 14px; margin-right: 10px;
     }
     #mensaje-reporte {
-  text-align: center;
-  font-weight: bold;
-  color: red;
-  margin-top: 10px;
-}
+      text-align: center; font-weight: bold; color: red; margin-top: 10px;
+    }
 
-/* 🔴 Resaltado para fuera de geocerca */
-.fuera-geo {
-  background: #ffe6e6; /* Rojo suave */
-}
-.fuera-geo:hover {
-  background: #ffd6d6; /* Un poco más intenso al pasar el mouse */
-}
-.resumen-geo{
-  width:90%;
-  margin:10px auto 0 auto;
-  display:flex;
-  gap:10px;
-  align-items:center;
-  justify-content:flex-start;
-  font-size:14px;
-}
-.chip{
-  display:inline-block;
-  padding:6px 10px;
-  border-radius:999px;
-  font-weight:600;
-}
-.chip.ok{
-  background:#e7f7e7;
-  color:#167c16;      /* verde */
-  border:1px solid #bfe6bf;
-}
-.chip.warn{
-  background:#ffe6e6;
-  color:#b01919;      /* rojo */
-  border:1px solid #ffc2c2;
-}
-.chip.neutral{
-  background:#eef2f7;
-  color:#3c4758;      /* gris */
-  border:1px solid #d8dee6;
-}
+    /* 🔴 Resaltado para fuera de geocerca */
+    .fuera-geo { background: #ffe6e6; }
+    .fuera-geo:hover { background: #ffd6d6; }
+
+    .resumen-geo {
+      width: 90%; margin: 10px auto 0 auto;
+      display: flex; gap: 10px; align-items: center; justify-content: flex-start; font-size: 14px;
+    }
+    .chip {
+      display: inline-block; padding: 6px 10px; border-radius: 999px; font-weight: 600;
+      border: 1px solid transparent;
+    }
+    .chip.ok { background: #e7f7e7; color: #167c16; border-color: #bfe6bf; }
+    .chip.warn { background: #ffe6e6; color: #b01919; border-color: #ffc2c2; }
+    .chip.neutral { background: #eef2f7; color: #3c4758; border-color: #d8dee6; }
   </style>
 </head>
 <body>
   <div class="contenedor">
     <img src="logo-dinex.png" alt="Logo DinEX" class="logo">
     <h1>Reporte de Horas por Empleado</h1>
+
     <input type="text" id="usuario" placeholder="Usuario" required>
     <button onclick="cargarReporte()" class="boton">Ver Reporte</button>
     <button onclick="exportarExcel()" class="boton">Exportar a Excel</button>
     <button onclick="exportarPDF()" class="boton">Exportar a PDF</button>
-    
-    <p id="mensaje-reporte"></p> <!-- MENSAJE DE ERROR -->
+
+    <p id="mensaje-reporte"></p>
 
     <div id="resultado" style="margin-top: 20px;"></div>
     <br>
@@ -132,6 +90,12 @@
   <script>
     let datosGlobal = [];
     let totalHorasStr = '';
+
+    function fmtFecha(iso) {
+      if (!iso || !iso.includes('-')) return '';
+      const [y, m, d] = iso.split('-');
+      return `${m}/${d}/${y}`;
+    }
 
     async function cargarReporte() {
       const usuario = document.getElementById("usuario").value.trim();
@@ -147,7 +111,7 @@
       }
 
       const res = await fetch("/api/reporte?usuario=" + encodeURIComponent(usuario));
-      const raw = await res.json();
+      const raw = await res.json().catch(() => []);
 
       if (!raw.length) {
         mensaje.textContent = "❌ Este empleado ha sido eliminado o no existe.";
@@ -155,25 +119,26 @@
       }
 
       const data = raw.sort((a, b) => {
-        if (a.fecha !== b.fecha) return a.fecha.localeCompare(b.fecha);
-        return a.hora.localeCompare(b.hora);
+        if (a.fecha !== b.fecha) return (a.fecha || '').localeCompare(b.fecha || '');
+        return (a.hora || '').localeCompare(b.hora || '');
       });
 
       datosGlobal = data;
 
-      // —— Resumen geocerca (cuentas)
-const dentro = data.filter(r => r.insideGeofence === true).length;
-const fuera  = data.filter(r => r.insideGeofence === false).length;
-const sinDato = data.filter(r => r.insideGeofence !== true && r.insideGeofence !== false).length;
+      // —— Resumen geocerca
+      const dentro = data.filter(r => r.insideGeofence === true).length;
+      const fuera  = data.filter(r => r.insideGeofence === false).length;
+      const sinDato = data.filter(r => r.insideGeofence !== true && r.insideGeofence !== false).length;
 
-let resumen = `
-  <div class="resumen-geo">
-    <span class="chip ok">✔ Dentro de rango: ${dentro}</span>
-    <span class="chip warn">⚠ Fuera de rango: ${fuera}</span>
-    ${sinDato ? `<span class="chip neutral">Sin dato: ${sinDato}</span>` : ``}
-  </div>
-`;
+      const resumen = `
+        <div class="resumen-geo">
+          <span class="chip ok">✔ Dentro de rango: ${dentro}</span>
+          <span class="chip warn">⚠ Fuera de rango: ${fuera}</span>
+          ${sinDato ? `<span class="chip neutral">Sin dato: ${sinDato}</span>` : ``}
+        </div>
+      `;
 
+      // —— Tabla
       let tabla = `
         <table class="tabla-reporte">
           <tr>
@@ -181,57 +146,58 @@ let resumen = `
             <th>Fecha</th>
             <th>Hora</th>
             <th>Departamento</th>
-            <th>IP</th>
+            <th>Geocerca</th>
           </tr>
       `;
 
       data.forEach(r => {
-  const [yy, mm, dd] = (r.fecha || '').split("-");
-  const esAutomatica = r.tipo === "salida" && r.auto === true;
-  const tipoTexto = esAutomatica ? "salida (automática)" : (r.tipo || '');
+        const esAutomatica = r.tipo === "salida" && r.auto === true;
+        const tipoTexto = esAutomatica ? "salida (automática)" : (r.tipo || '');
+        const estadoGeo =
+          r.insideGeofence === true ? 'Dentro de rango' :
+          r.insideGeofence === false ? 'Fuera de rango' : '-';
 
-  const estadoGeo = (r.insideGeofence === true)
-  ? '(Dentro de rango)'
-  : (r.insideGeofence === false)
-    ? '(Fuera de rango)'
-    : '';
-
-  tabla += `
-    <tr class="${r.insideGeofence === false ? 'fuera-geo' : ''}">
-      <td>${tipoTexto}</td>
-      <td>${mm}/${dd}/${yy}</td>
-      <td>${r.hora || ''}</td>
-      <td>${r.departamento || ''}</td>
-      <td>${estadoGeo}</td>
-
-    </tr>
-  `;
-});
+        tabla += `
+          <tr class="${r.insideGeofence === false ? 'fuera-geo' : ''}">
+            <td>${tipoTexto}</td>
+            <td>${fmtFecha(r.fecha)}</td>
+            <td>${r.hora || ''}</td>
+            <td>${r.departamento || ''}</td>
+            <td>${estadoGeo}</td>
+          </tr>
+        `;
+      });
 
       tabla += `</table><br>`;
 
-      // Calcular total de horas
+      // —— Total de horas por días (entrada más temprana a salida más tardía)
       const porDia = data.reduce((acc, r) => {
+        if (!r.fecha) return acc;
         acc[r.fecha] = acc[r.fecha] || [];
         acc[r.fecha].push(r);
         return acc;
       }, {});
+
       let totalMs = 0;
       Object.entries(porDia).forEach(([fecha, regs]) => {
-        const entradas = regs.filter(x => x.tipo === 'entrada').sort((a,b) => a.hora.localeCompare(b.hora));
-        const salidas  = regs.filter(x => x.tipo === 'salida').sort((a,b) => a.hora.localeCompare(b.hora));
+        const entradas = regs.filter(x => x.tipo === 'entrada').sort((a,b) => (a.hora || '').localeCompare(b.hora || ''));
+        const salidas  = regs.filter(x => x.tipo === 'salida').sort((a,b) => (a.hora || '').localeCompare(b.hora || ''));
         if (entradas.length && salidas.length) {
           const inicio = new Date(`${fecha}T${entradas[0].hora}`);
           const fin    = new Date(`${fecha}T${salidas[salidas.length-1].hora}`);
-          totalMs += fin - inicio;
+          if (!isNaN(inicio) && !isNaN(fin) && fin > inicio) {
+            totalMs += (fin - inicio);
+          }
         }
       });
+
       const horas   = Math.floor(totalMs / 3600000);
       const minutos = Math.floor((totalMs % 3600000) / 60000);
       totalHorasStr = `${horas}h ${minutos}m`;
-      tabla += `<p style="text-align:center; font-weight:bold;">Total de horas trabajadas: ${totalHorasStr}</p>`;
 
-      cont.innerHTML = resumen + tabla;
+      const totalHTML = `<p style="text-align:center; font-weight:bold;">Total de horas trabajadas: ${totalHorasStr}</p>`;
+
+      cont.innerHTML = resumen + tabla + totalHTML;
     }
 
     function exportarExcel() {
@@ -240,28 +206,25 @@ let resumen = `
         return;
       }
       const rows = datosGlobal.map(d => {
-  const [y, m, d2] = (d.fecha || '').split('-');
-  const tipoTexto = d.tipo === "salida" && d.auto === true ? "salida (automática)" : (d.tipo || '');
-  const estadoGeo = (d.insideGeofence === true)
-  ? '(Dentro de rango)'
-  : (d.insideGeofence === false)
-    ? '(Fuera de rango)'
-    : '';
-  return {
-    Acción       : tipoTexto,
-    Fecha        : `${m}/${d2}/${y}`,
-    Hora         : d.hora || '',
-    Departamento : d.departamento || '',
-    IP           : estadoGeo
-  };
-});
+        const tipoTexto = d.tipo === "salida" && d.auto === true ? "salida (automática)" : (d.tipo || '');
+        const estadoGeo =
+          d.insideGeofence === true ? 'Dentro de rango' :
+          d.insideGeofence === false ? 'Fuera de rango' : '-';
+        return {
+          "Acción"       : tipoTexto,
+          "Fecha"        : fmtFecha(d.fecha),
+          "Hora"         : d.hora || '',
+          "Departamento" : d.departamento || '',
+          "Geocerca"     : estadoGeo
+        };
+      });
       rows.push({});
-      rows.push({ Acción: 'Total horas', Hora: totalHorasStr });
+      rows.push({ "Acción": "Total horas", "Hora": totalHorasStr });
 
-      const ws = XLSX.utils.json_to_sheet(rows, {skipHeader:false});
+      const ws = XLSX.utils.json_to_sheet(rows, { skipHeader: false });
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, "Reporte");
-      ws['!cols'] = [{wpx:100},{wpx:80},{wpx:80},{wpx:100},{wpx:120}];
+      ws['!cols'] = [{wpx:120},{wpx:90},{wpx:80},{wpx:130},{wpx:130}];
       XLSX.writeFile(wb, "reporte-usuario.xlsx");
     }
 
@@ -273,11 +236,12 @@ let resumen = `
       const usuario = document.getElementById("usuario").value.trim();
 
       const usuariosRes = await fetch("/api/usuarios");
-      const mapaNombres = await usuariosRes.json();
+      const mapaNombres = await usuariosRes.json().catch(() => ({}));
       const nombreCompleto = mapaNombres[usuario] || usuario;
 
       const { jsPDF } = window.jspdf;
       const doc = new jsPDF();
+
       const img = new Image();
       img.src = 'logo-dinex.png';
 
@@ -290,18 +254,14 @@ let resumen = `
         doc.setTextColor(0);
         doc.text("Reporte de Horas por Empleado", 70, 28);
 
-        const cols = ["Acción", "Fecha", "Hora", "Departamento", "IP"];
+        const cols = ["Acción", "Fecha", "Hora", "Departamento", "Geocerca"];
         const filas = datosGlobal.map(d => {
-  const [y, m, d2] = (d.fecha || '').split('-');
-  const tipoTexto = d.tipo === "salida" && d.auto === true ? "salida (automática)" : (d.tipo || '');
-  const estadoGeo = (d.insideGeofence === true)
-  ? '(Dentro de rango)'
-  : (d.insideGeofence === false)
-    ? '(Fuera de rango)'
-    : '';
-  return [tipoTexto, `${m}/${d2}/${y}`, d.hora || '', d.departamento || '', estadoGeo
-];
-});
+          const tipoTexto = d.tipo === "salida" && d.auto === true ? "salida (automática)" : (d.tipo || '');
+          const estadoGeo =
+            d.insideGeofence === true ? 'Dentro de rango' :
+            d.insideGeofence === false ? 'Fuera de rango' : '-';
+          return [tipoTexto, fmtFecha(d.fecha), d.hora || '', d.departamento || '', estadoGeo];
+        });
         filas.push(['','','','','']);
         filas.push(['Total horas','', totalHorasStr,'','']);
 
