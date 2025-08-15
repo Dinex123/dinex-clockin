@@ -102,14 +102,14 @@ app.use((req, res, next) => {
   next();
 });
 
-// Sirve estáticos. Si tus HTML/CSS/JS están en /public, déjalo así.
-// Si algunos .html están en la raíz del proyecto, también los servimos:
+// Sirve estáticos (primero /public; luego raíz del repo si tienes html sueltos)
 app.use(express.static(path.join(__dirname, 'public')));
-app.use(express.static(path.join(__dirname))); // cuidado: por eso bloqueamos .json/.db arriba
+app.use(express.static(path.join(__dirname))); // por eso bloqueamos .json/.db arriba
 
-// ==== Endpoints de salud ====
+// ==== Endpoints de salud / ping ====
 app.get('/health',  (req, res) => res.send('ok'));
 app.get('/healthz', (req, res) => res.send('OK'));
+app.get('/api/ping', (req, res) => res.json({ ok: true, time: new Date().toISOString() }));
 
 // ====== Geocerca (configura tu sede) ======
 const OFFICES = [
@@ -538,7 +538,7 @@ app.get('/api/empleados-inactivos', (req, res) => {
   }
 });
 
-// Reset de contraseña (nombre confuso, pero respeta tu endpoint actual)
+// Reset de contraseña (usa users.json)
 app.post('/api/reset-password-admin', (req, res) => {
   try {
     const { usuario, nuevaClave } = req.body || {};
