@@ -1,5 +1,6 @@
 
 // server.js
+// ==== Dependencias ====
 const express    = require('express');
 const path       = require('path');
 const fs         = require('fs');
@@ -11,67 +12,119 @@ const sqlite3    = require('sqlite3').verbose();
 
 const app  = express();
 
-// Render te da el puerto en una variable
-const PORT = process.env.PORT || 3000;
+// ==== Config básica Render ====
+const PORT     = parseInt(process.env.PORT || '3000', 10);
+const DATA_DIR = process.env.DATA_DIR || __dirname; // en Render usa /data si lo configuras
 
-// Directorio de datos (en Render será /data; en tu PC queda esta misma carpeta)
-const DATA_DIR = process.env.DATA_DIR || __dirname;
-
-// Rutas importantes
+// ==== Rutas de archivos ====
 const PATHS = {
-  dbFile:      path.join(DATA_DIR, 'db', 'dev.db'),
-  marcajes:    path.join(DATA_DIR, 'marcajes.json'),
-  users:       path.join(DATA_DIR, 'users.json'),
-  admins:      path.join(DATA_DIR, 'admins.json'),
-  backupsDir:  path.join(DATA_DIR, 'backups')
+  dbDir:      path.join(DATA_DIR, 'db'),
+  dbFile:     path.join(DATA_DIR, 'db', 'dev.db'),
+  marcajes:   path.join(DATA_DIR, 'marcajes.json'),
+  users:      path.join(DATA_DIR, 'users.json'),
+  admins:     path.join(DATA_DIR, 'admins.json'),
+  backupsDir: path.join(DATA_DIR, 'backups')
 };
 
-// Crea carpetas si faltan
-fs.mkdirSync(path.join(DATA_DIR, 'db'), { recursive: true });
-fs.mkdirSync(PATHS.backupsDir, { recursive: true });
-
-// Si no existen estos JSON, créalos vacíos
-function ensureJson(filePath, fallback = '[]') {
-  if (!fs.existsSync(filePath)) fs.writeFileSync(filePath, fallback, 'utf8');
+// ==== Helpers de FS seguros ====
+function ensureDirSync(dir) {
+  try { fs.mkdirSync(dir, { recursive: true }); } catch (e) { /* noop */ }
 }
-ensureJson(PATHS.marcajes, '[]');
-ensureJson(PATHS.users, '[]');
-ensureJson(PATHS.admins, '[]'); // si no usas admins, igual déjalo
 
-// Confía en el proxy para obtener la IP real en Render
+function ensureJsonSync(filePath, fallback = '[]') {
+  try {
+    if (!fs.existsSync(filePath)) fs.writeFileSync(filePath, fallback, 'utf8');
+  } catch (e) {
+    console.error('ensureJsonSync error:', e);
+  }
+}
+
+function readJsonSafe(filePath, fallback = []) {
+  try {
+    const raw = fs.readFileSync(filePath, 'utf8').trim();
+    return raw ? JSON.parse(raw) : fallback;
+  } catch (e) {
+    return fallback;
+  }
+}
+
+function writeJsonSafe(filePath, data) {
+  try {
+    fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf8');
+    return true;
+  } catch (e) {
+    console.error('writeJsonSafe error:', e);
+    return false;
+  }
+}
+
+function getRealIp(req) {
+  const xff = (req.headers['x-forwarded-for'] || '').toString();
+  return (xff.split(',')[0] || req.ip || '').trim();
+}
+
+// ==== Crear carpetas/archivos base ====
+ensureDirSync(PATHS.dbDir);
+ensureDirSync(PATHS.backupsDir);
+ensureJsonSync(PATHS.marcajes, '[]');
+ensureJsonSync(PATHS.users, '[]');
+ensureJsonSync(PATHS.admins, '[]');
+
+// ==== Confía en el proxy (Render) para IP real ====
 app.set('trust proxy', true);
 
-// Conecta SQLite usando la ruta persistente
+// ==== DB SQLite y esquema ====
 const db = new sqlite3.Database(PATHS.dbFile);
+db.serialize(() => {
+  db.run(
+    `CREATE TABLE IF NOT EXISTS registros (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      usuario TEXT,
+      tipo TEXT,
+      fecha TEXT,
+      hora TEXT,
+      ip TEXT,
+      departamento TEXT
+    );`,
+    (err) => {
+      if (err) console.error('Error creando tabla SQLite:', err.message);
+      else console.log('SQLite OK: tabla registros lista');
+    }
+  );
+});
 
-// 1) Middleware para parsear JSON
+// ==== Middlewares ====
 app.use(bodyParser.json());
 
-// === Endpoints de salud y prueba ===
-app.get('/healthz', (req, res) => {
-  res.status(200).send('OK');
+// Bloquea acceso público a JSON/DB por seguridad (antes de estáticos)
+app.use((req, res, next) => {
+  if (/\.(json|db)$/i.test(req.path)) return res.status(403).send('Forbidden');
+  next();
 });
 
-app.get('/api/ping', (req, res) => {
-  res.json({ ok: true, time: new Date().toISOString() });
-});
+// Sirve estáticos. Si tus HTML/CSS/JS están en /public, déjalo así.
+// Si algunos .html están en la raíz del proyecto, también los servimos:
+app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.static(path.join(__dirname))); // cuidado: por eso bloqueamos .json/.db arriba
+
+// ==== Endpoints de salud ====
+app.get('/health',  (req, res) => res.send('ok'));
+app.get('/healthz', (req, res) => res.send('OK'));
 
 // ====== Geocerca (configura tu sede) ======
-//Coordenadas de la oficina (Google Maps)
 const OFFICES = [
-  { id: 'TX-116', name: 'Sede 1 - Quickstop',  lat: 29.71694, lng: -95.48804, radiusMeters: 150 },
-  { id: 'TX-117', name: 'Sede 2 - Rosemberg',  lat: 29.57039, lng: -95.77575, radiusMeters: 150 },
-  { id: 'TX-1293', name: 'Sede 3 - South West',  lat: 29.70031, lng: -95.28904, radiusMeters: 150 },
+  { id: 'TX-116',  name: 'Sede 1 - Quickstop',  lat: 29.71694, lng: -95.48804, radiusMeters: 150 },
+  { id: 'TX-117',  name: 'Sede 2 - Rosemberg',  lat: 29.57039, lng: -95.77575, radiusMeters: 150 },
+  { id: 'TX-1293', name: 'Sede 3 - South West', lat: 29.70031, lng: -95.28904, radiusMeters: 150 },
   { id: 'TX-1386', name: 'Sede 4 - LongPoint',  lat: 29.79806, lng: -95.52474, radiusMeters: 150 },
-  { id: 'TX-1615', name: 'Sede 5 - Rampart',  lat: 29.71948, lng: -95.48853, radiusMeters: 150 },
-  { id: 'TX-839', name: 'Sede 6 - Rosemberg C',  lat: 29.55853, lng: -95.80851, radiusMeters: 150 },
-  { id: 'TX-845', name: 'Sede 7 - Airline',  lat: 29.89497, lng: -95.39804, radiusMeters: 150 },
-  { id: 'TX-1544', name: 'Sede 8 - Fry',  lat: 29.79521, lng: -95.71863, radiusMeters: 150 },
-  { id: 'TX-104', name: 'Sede 9 - Fulton',  lat: 29.83249, lng: -95.37564, radiusMeters: 150 },
-  { id: 'TX-101', name: 'Sede 10 - Office', lat: 29.74978, lng: -95.48319, radiusMeters: 150 },
+  { id: 'TX-1615', name: 'Sede 5 - Rampart',    lat: 29.71948, lng: -95.48853, radiusMeters: 150 },
+  { id: 'TX-839',  name: 'Sede 6 - Rosemberg C',lat: 29.55853, lng: -95.80851, radiusMeters: 150 },
+  { id: 'TX-845',  name: 'Sede 7 - Airline',    lat: 29.89497, lng: -95.39804, radiusMeters: 150 },
+  { id: 'TX-1544', name: 'Sede 8 - Fry',        lat: 29.79521, lng: -95.71863, radiusMeters: 150 },
+  { id: 'TX-104',  name: 'Sede 9 - Fulton',     lat: 29.83249, lng: -95.37564, radiusMeters: 150 },
+  { id: 'TX-101',  name: 'Sede 10 - Office',    lat: 29.74978, lng: -95.48319, radiusMeters: 150 },
 ];
 
-// ====== Utilidades geográficas ======
 function distanceMeters(lat1, lon1, lat2, lon2) {
   const R = 6371000;
   const toRad = d => d * Math.PI / 180;
@@ -90,424 +143,322 @@ function findGeofence(lat, lng) {
   return { inside: false };
 }
 
-// Modo: true = BLOQUEA si está fuera; false = permite pero marca como "fuera"
+// true = bloquea si está fuera; false = permite pero etiqueta "(fuera de geocerca)"
 const MODO_ESTRICTO = false;
 
-// BACKUP AUTOMATICO A LAS 11PM
-const backupFolder = PATHS.backupsDir;
-if (!fs.existsSync(backupFolder)) fs.mkdirSync(backupFolder);
-
+// ==== Backups (automático 23:00 y manual) ====
 cron.schedule('0 23 * * *', () => {
   const fecha = new Date().toISOString().split('T')[0];
-  const origenJSON  = PATHS.marcajes;
-const destinoJSON = path.join(backupFolder, `marcajes-${fecha}.json`);
-const origenDB    = PATHS.dbFile;
-const destinoDB   = path.join(backupFolder, `dev-${fecha}.db`);
-
   try {
-    fse.copySync(origenJSON, destinoJSON);
-    fse.copySync(origenDB, destinoDB);
-    console.log(`[Backup] Copia guardada: ${fecha}`);
-  } catch (err) {
-    console.error('[Backup] Error al hacer la copia:', err);
-  }
+    fse.copySync(PATHS.marcajes, path.join(PATHS.backupsDir, `marcajes-${fecha}.json`));
+  } catch (e) { console.error('[Backup JSON] Error:', e.message); }
+  try {
+    fse.copySync(PATHS.dbFile, path.join(PATHS.backupsDir, `dev-${fecha}.db`));
+  } catch (e) { console.error('[Backup DB] Error:', e.message); }
+  console.log(`[Backup] Copias completadas: ${fecha}`);
 });
 
-// BACKUP MANUAL
 app.get('/api/backup-now', (req, res) => {
   const fecha = new Date().toISOString().split('T')[0];
-  const origenJSON  = PATHS.marcajes;
-  const destinoJSON = path.join(backupFolder, `marcajes-${fecha}.json`);
-  const origenDB    = PATHS.dbFile;
-  const destinoDB   = path.join(backupFolder, `dev-${fecha}.db`);
-
   try {
-    fse.copySync(origenJSON, destinoJSON);
-    fse.copySync(origenDB, destinoDB);
+    fse.copySync(PATHS.marcajes, path.join(PATHS.backupsDir, `marcajes-${fecha}.json`));
+    fse.copySync(PATHS.dbFile, path.join(PATHS.backupsDir, `dev-${fecha}.db`));
     console.log(`[Backup manual] Copia creada: ${fecha}`);
-    res.json({ success: true, mensaje: "Backup creado correctamente." });
+    res.json({ success: true, mensaje: 'Backup creado correctamente.' });
   } catch (err) {
     console.error('[Backup manual] Error:', err);
-    res.status(500).json({ success: false, mensaje: "Error al crear el backup." });
+    res.status(500).json({ success: false, mensaje: 'Error al crear el backup.' });
   }
 });
 
-// 2.2) Login administrador
+// ==== Auth/Admin/Usuarios ====
 app.post('/api/admin-login', (req, res) => {
-  const { username, password } = req.body;
-  const admins = JSON.parse(fs.readFileSync(PATHS.admins, 'utf8'));
-  const valid  = admins.some(a => a.username === username && a.password === password);
-  res.json({ success: valid });
-});
-
-// 2.3) Crear usuario con fecha de creación
-app.post('/api/crear-usuario', (req, res) => {
-  const uPath = PATHS.users;
-  if (!fs.existsSync(uPath)) fs.writeFileSync(uPath, '[]', 'utf8');
-  
-  const users = JSON.parse(fs.readFileSync(uPath, 'utf8'));
-  const existe = users.some(u => u.usuario === req.body.usuario);
-  if (existe) {
-    return res.json({ success: false, mensaje: "Usuario ya existe." });
-  }
-
-  // Construir usuario con campos adicionales
-  const nuevoUsuario = {
-    nombre: req.body.nombre,
-    usuario: req.body.usuario,
-    contrasena: req.body.contrasena,
-    departamento: req.body.departamento,
-    activo: true,
-    estado: "Activo",
-    fecha_creacion: req.body.fecha_creacion || new Date().toISOString(),
-    fecha_baja: null
-  };
-
-  users.push(nuevoUsuario);
-  fs.writeFileSync(uPath, JSON.stringify(users, null, 2), 'utf8');
-  res.json({ success: true, mensaje: "Usuario creado correctamente." });
-});
-
-// 2.4) Login usuario (devuelve departamento)
-app.post('/api/login-usuario', (req, res) => {
-  const uPath = PATHS.users;
-  if (!fs.existsSync(uPath)) return res.json({ success: false });
-  const users = JSON.parse(fs.readFileSync(uPath, 'utf8'));
-  const u = users.find(u =>
-    u.usuario === req.body.usuario &&
-    u.contrasena === req.body.contrasena &&
-    u.activo !== false
-  );
-  res.json(u
-    ? { success: true, departamento: u.departamento }
-    : { success: false }
-  );
-});
-
-// 2.5) Marcaje con límite de 4 por día + geolocalización
-app.post('/api/marcar', (req, res) => {
-  const p = PATHS.marcajes;
-  let all = [];
   try {
-    const raw = fs.readFileSync(p, 'utf8').trim();
-    all = raw ? JSON.parse(raw) : [];
-  } catch (_) {
-    all = [];
-  }
-
-  const now = moment().tz('America/Chicago');
-  const fechaHoy = now.format('YYYY-MM-DD');
-  const hora = now.format('HH:mm:ss');
-
-  const usuario = req.body.usuario;
-  const tipo = req.body.tipo;
-  const departamento = req.body.departamento || '';
-
-  // === NUEVO: ubicación desde el front (lat/lng/accuracy) ===
-  const location = req.body.location || null;
-  const lat = location && typeof location.lat === 'number' ? location.lat : null;
-  const lng = location && typeof location.lng === 'number' ? location.lng : null;
-  const accuracy = location && typeof location.accuracy === 'number' ? location.accuracy : null;
-
-  // Si queremos obligar ubicación para marcar:
-  if (lat === null || lng === null) {
-    return res.status(400).json({
-      success: false,
-      mensaje: 'Faltan coordenadas. Debes permitir la ubicación para marcar.'
-    });
-  }
-
-  // Validar geocerca
-  const gf = findGeofence(lat, lng);
-  if (MODO_ESTRICTO && !gf.inside) {
-    return res.status(403).json({
-      success: false,
-      mensaje: 'Marcaje rechazado: estás fuera del área permitida.'
-    });
-  }
-
-  // === LÓGICA EXISTENTE (auto salida del día anterior) ===
-  const fechaAyer = moment(now).subtract(1, 'day').format('YYYY-MM-DD');
-  const registrosAyer = all.filter(r => r.usuario === usuario && r.fecha === fechaAyer);
-
-  const huboEntrada = registrosAyer.some(r => r.tipo === 'entrada');
-  const huboSalida = registrosAyer.some(r => r.tipo === 'salida');
-
-  let advertencia = "";
-
-  if (huboEntrada && !huboSalida) {
-    const autoSalida = {
-      usuario: usuario,
-      tipo: 'salida',
-      fecha: fechaAyer,
-      hora: '20:00:00',
-      ip: req.ip,
-      departamento: departamento,
-      auto: true,
-
-      // Campos de ubicación no aplican aquí (es un cierre automático)
-      lat: null,
-      lng: null,
-      accuracy: null,
-      insideGeofence: null,
-      geofenceId: null,
-      geofenceName: null,
-      distanceToCenterM: null,
-      userAgent: req.headers['user-agent'] || null
-    };
-    all.push(autoSalida);
-    advertencia = "⚠️ Se detectó que ayer no se marcó salida. Se registró una salida automática a las 20:00.";
-
-    // Guardamos en SQLite (sin columnas de ubicación por ahora)
-    db.run(
-      `INSERT INTO registros (usuario, tipo, fecha, hora, ip, departamento) VALUES (?, ?, ?, ?, ?, ?)`,
-      [usuario, 'salida', fechaAyer, '20:00:00', req.ip, departamento]
-    );
-  }
-
-  // Evitar duplicado de tipo en el día
-  const yaMarcadoHoy = all.some(r =>
-    r.usuario === usuario &&
-    r.fecha === fechaHoy &&
-    r.tipo === tipo
-  )
-  if (yaMarcadoHoy) {
-    return res.json({
-      success: false,
-      mensaje: `Ya registraste una marcación de tipo "${tipo}" hoy. No puedes repetirla.`
-    });
-  }
-
-  // Máximo 4 marcajes
-  const count = all.filter(x => x.usuario === usuario && x.fecha === fechaHoy).length;
-  if (count >= 4) {
-    return res.json({ success: false, mensaje: 'Su turno ya terminó.' });
-  }
-
-  // === NUEVO: guardamos ubicación y veredicto de geocerca en JSON ===
-  const nuevoMarcaje = {
-    usuario,
-    tipo,
-    fecha: fechaHoy,
-    hora,
-    ip: req.ip,
-    departamento,
-
-    lat, lng, accuracy,
-    insideGeofence: gf.inside,
-    geofenceId: gf.inside ? gf.id : null,
-    geofenceName: gf.inside ? gf.name : null,
-    distanceToCenterM: gf.distance ? Math.round(gf.distance) : null,
-    userAgent: req.headers['user-agent'] || null
-  };
-
-  // Guardar en JSON
-  all.push(nuevoMarcaje);
-  fs.writeFileSync(p, JSON.stringify(all, null, 2), 'utf8');
-
-  // Guardar en SQLite (mantengo tu esquema actual SIN columnas nuevas)
-  db.run(
-    `INSERT INTO registros (usuario, tipo, fecha, hora, ip, departamento) VALUES (?, ?, ?, ?, ?, ?)`,
-    [usuario, tipo, fechaHoy, hora, req.ip, departamento]
-  );
-
-  const mensajeFinal = advertencia
-    ? `${advertencia}\nMarcaje de ${tipo} registrado a las ${hora}.`
-    : `Marcaje de ${tipo} registrado a las ${hora}.`;
-
-  // Si MODO_ESTRICTO=false y está fuera, lo avisamos en el mensaje
-  const suffix = (!MODO_ESTRICTO && !gf.inside) ? ' (fuera de geocerca)' : '';
-
-  res.json({
-    success: true,
-    mensaje: mensajeFinal + suffix,
-    insideGeofence: gf.inside,
-    geofence: gf.inside ? { id: gf.id, name: gf.name, distanceM: Math.round(gf.distance) } : null
-  });
-});
-
-// 2.6) Reporte por usuario CON IP (solo si el usuario está activo)
-app.get('/api/reporte', (req, res) => {
-  const usuario = req.query.usuario;
-  const p = PATHS.marcajes;
-  const uPath = PATHS.users;
-
-  // Verificar que el usuario exista y esté activo
-  if (!fs.existsSync(uPath)) return res.json([]);
-  const users = JSON.parse(fs.readFileSync(uPath, 'utf8'));
-  const user = users.find(u => u.usuario === usuario);
-
-  if (!user || user.activo !== true) {
-    return res.json([]); // Usuario eliminado o no existe
-  }
-
-  // Cargar marcajes si el usuario es válido
-  if (!fs.existsSync(p)) return res.json([]);
-  const raw = fs.readFileSync(p, 'utf8').trim();
-  const all = raw ? JSON.parse(raw) : [];
-
-  const filt = all.filter(x => x.usuario === usuario);
-  res.json(filt);
-});
-
-// 2.7) Listar empleados activos
-app.get('/api/empleados', (req, res) => {
-  const uPath = PATHS.users;
-  if (!fs.existsSync(uPath)) return res.json([]);
-  const users = JSON.parse(fs.readFileSync(uPath, 'utf8'));
-  res.json(users.filter(u => u.activo !== false));
-});
-
-// 2.7.1) Obtener diccionario de nombres completos por username
-app.get('/api/usuarios', (req, res) => {
-  const uPath = PATHS.users;
-  if (!fs.existsSync(uPath)) return res.status(404).json({ error: 'Archivo users.json no encontrado' });
-
-  const users = JSON.parse(fs.readFileSync(uPath, 'utf8'));
-  const nombres = {};
-  users.forEach(u => {
-    nombres[u.usuario] = u.nombre;
-  });
-  res.json(nombres);
-});
-
-// 2.8) Reporte global (solo usuarios activos)
-app.get('/api/reporte-todos', (req, res) => {
-  try {
-    const pMarcajes = PATHS.marcajes;
-    const pUsuarios = PATHS.users;
-
-    if (!fs.existsSync(pMarcajes) || !fs.existsSync(pUsuarios)) return res.json([]);
-
-    const rawMarcajes = fs.readFileSync(pMarcajes, 'utf8').trim();
-    const all = rawMarcajes ? JSON.parse(rawMarcajes) : [];
-
-    const rawUsers = fs.readFileSync(pUsuarios, 'utf8').trim();
-    const usuarios = rawUsers ? JSON.parse(rawUsers) : [];
-
-    // ✅ Solo usuarios con activo !== false
-    const usuariosActivos = new Set(
-      usuarios.filter(u => u.activo !== false).map(u => u.usuario)
-    );
-
-    // Filtrar marcajes
-    const filtrados = all.filter(m => usuariosActivos.has(m.usuario));
-
-    // Ordenar por usuario, luego por fecha y hora
-    filtrados.sort((a, b) => {
-      if (a.usuario !== b.usuario) return a.usuario.localeCompare(b.usuario);
-      if (a.fecha !== b.fecha) return a.fecha.localeCompare(b.fecha);
-      return (a.hora || '').localeCompare(b.hora || '');
-    });
-
-    res.json(filtrados);
-  } catch (err) {
-    console.error('Error en GET /api/reporte-todos:', err);
-    res.status(500).json({ error: 'Error interno leyendo marcajes.' });
-  }
-});
-
-// 2.9) Borrar un marcaje individual
-app.delete('/api/borrar-marcaje', (req, res) => {
-  try {
-    const { usuario, index } = req.body;
-    const p = PATHS.marcajes;
-    const raw = fs.readFileSync(p, 'utf8').trim();
-    const all = raw ? JSON.parse(raw) : [];
-
-    // filtrar solo los de este usuario
-    const regs = all.filter(m => m.usuario === usuario);
-    const item = regs[index];
-    if (!item) return res.json({ success: false });
-
-    // localizar en array original y eliminar
-    const globalIdx = all.indexOf(item);
-    if (globalIdx === -1) return res.json({ success: false });
-
-    all.splice(globalIdx, 1);
-    fs.writeFileSync(p, JSON.stringify(all, null, 2), 'utf8');
-
-    // Opcional: también podrías eliminar del SQLite si lo deseas
-    // db.run(`DELETE FROM registros WHERE rowid = ?`, [item.rowid], ...);
-
-    res.json({ success: true });
-  } catch (err) {
-    console.error('Error en DELETE /api/borrar-marcaje:', err);
+    const { username, password } = req.body || {};
+    const admins = readJsonSafe(PATHS.admins, []);
+    const valid  = admins.some(a => a.username === username && a.password === password);
+    res.json({ success: !!valid });
+  } catch (e) {
+    console.error('admin-login error:', e);
     res.status(500).json({ success: false });
   }
 });
 
-// 2.10) Limpiar todos los marcajes (JSON + SQLite)
+app.post('/api/crear-usuario', (req, res) => {
+  try {
+    const users = readJsonSafe(PATHS.users, []);
+    if (users.some(u => u.usuario === req.body.usuario)) {
+      return res.json({ success: false, mensaje: 'Usuario ya existe.' });
+    }
+    const nuevoUsuario = {
+      nombre: req.body.nombre,
+      usuario: req.body.usuario,
+      contrasena: req.body.contrasena,
+      departamento: req.body.departamento,
+      activo: true,
+      estado: 'Activo',
+      fecha_creacion: req.body.fecha_creacion || new Date().toISOString(),
+      fecha_baja: null
+    };
+    users.push(nuevoUsuario);
+    writeJsonSafe(PATHS.users, users);
+    res.json({ success: true, mensaje: 'Usuario creado correctamente.' });
+  } catch (e) {
+    console.error('crear-usuario error:', e);
+    res.status(500).json({ success: false });
+  }
+});
+
+app.post('/api/login-usuario', (req, res) => {
+  try {
+    const users = readJsonSafe(PATHS.users, []);
+    const u = users.find(u =>
+      u.usuario === req.body.usuario &&
+      u.contrasena === req.body.contrasena &&
+      u.activo !== false
+    );
+    res.json(u ? { success: true, departamento: u.departamento } : { success: false });
+  } catch (e) {
+    console.error('login-usuario error:', e);
+    res.status(500).json({ success: false });
+  }
+});
+
+// ==== Marcaje ====
+app.post('/api/marcar', (req, res) => {
+  try {
+    let all = readJsonSafe(PATHS.marcajes, []);
+
+    const now       = moment().tz('America/Chicago');
+    const fechaHoy  = now.format('YYYY-MM-DD');
+    const hora      = now.format('HH:mm:ss');
+
+    const usuario      = req.body.usuario;
+    const tipo         = req.body.tipo;
+    const departamento = req.body.departamento || '';
+    const ip           = getRealIp(req);
+
+    // Ubicación del front
+    const location = req.body.location || {};
+    const lat = (typeof location.lat === 'number') ? location.lat : null;
+    const lng = (typeof location.lng === 'number') ? location.lng : null;
+    const accuracy = (typeof location.accuracy === 'number') ? location.accuracy : null;
+
+    if (lat === null || lng === null) {
+      return res.status(400).json({ success: false, mensaje: 'Faltan coordenadas. Debes permitir la ubicación para marcar.' });
+    }
+
+    const gf = findGeofence(lat, lng);
+    if (MODO_ESTRICTO && !gf.inside) {
+      return res.status(403).json({ success: false, mensaje: 'Marcaje rechazado: estás fuera del área permitida.' });
+    }
+
+    // Auto-salida 20:00 del día anterior, si aplica
+    const fechaAyer = moment(now).subtract(1, 'day').format('YYYY-MM-DD');
+    const registrosAyer = all.filter(r => r.usuario === usuario && r.fecha === fechaAyer);
+    const huboEntrada = registrosAyer.some(r => r.tipo === 'entrada');
+    const huboSalida  = registrosAyer.some(r => r.tipo === 'salida');
+
+    let advertencia = '';
+    if (huboEntrada && !huboSalida) {
+      const autoSalida = {
+        usuario, tipo: 'salida', fecha: fechaAyer, hora: '20:00:00',
+        ip, departamento,
+        lat: null, lng: null, accuracy: null,
+        insideGeofence: null, geofenceId: null, geofenceName: null, distanceToCenterM: null,
+        auto: true,
+        userAgent: req.headers['user-agent'] || null
+      };
+      all.push(autoSalida);
+      writeJsonSafe(PATHS.marcajes, all);
+      db.run(
+        `INSERT INTO registros (usuario, tipo, fecha, hora, ip, departamento) VALUES (?, ?, ?, ?, ?, ?)`,
+        [usuario, 'salida', fechaAyer, '20:00:00', ip, departamento],
+        (err) => { if (err) console.error('SQLite auto-salida:', err.message); }
+      );
+      advertencia = '⚠️ Se detectó que ayer no se marcó salida. Se registró una salida automática a las 20:00.';
+    }
+
+    // Evita duplicado de tipo en el día
+    const yaMarcadoHoy = all.some(r => r.usuario === usuario && r.fecha === fechaHoy && r.tipo === tipo);
+    if (yaMarcadoHoy) {
+      return res.json({ success: false, mensaje: `Ya registraste una marcación de tipo "${tipo}" hoy. No puedes repetirla.` });
+    }
+
+    // Máximo 4 marcajes por día
+    const count = all.filter(x => x.usuario === usuario && x.fecha === fechaHoy).length;
+    if (count >= 4) {
+      return res.json({ success: false, mensaje: 'Su turno ya terminó.' });
+    }
+
+    const nuevoMarcaje = {
+      usuario, tipo, fecha: fechaHoy, hora, ip, departamento,
+      lat, lng, accuracy,
+      insideGeofence: gf.inside,
+      geofenceId: gf.inside ? gf.id : null,
+      geofenceName: gf.inside ? gf.name : null,
+      distanceToCenterM: gf.distance ? Math.round(gf.distance) : null,
+      userAgent: req.headers['user-agent'] || null
+    };
+
+    all.push(nuevoMarcaje);
+    writeJsonSafe(PATHS.marcajes, all);
+
+    db.run(
+      `INSERT INTO registros (usuario, tipo, fecha, hora, ip, departamento) VALUES (?, ?, ?, ?, ?, ?)`,
+      [usuario, tipo, fechaHoy, hora, ip, departamento],
+      (err) => { if (err) console.error('SQLite insertar:', err.message); }
+    );
+
+    const suffix = (!MODO_ESTRICTO && !gf.inside) ? ' (fuera de geocerca)' : '';
+    const mensajeFinal = (advertencia ? `${advertencia}\n` : '') + `Marcaje de ${tipo} registrado a las ${hora}.`;
+
+    res.json({
+      success: true,
+      mensaje: mensajeFinal + suffix,
+      insideGeofence: gf.inside,
+      geofence: gf.inside ? { id: gf.id, name: gf.name, distanceM: Math.round(gf.distance) } : null
+    });
+  } catch (e) {
+    console.error('POST /api/marcar error:', e);
+    res.status(500).json({ success: false, mensaje: 'Error interno en marcaje.' });
+  }
+});
+
+// ==== Reportes / Usuarios activos/inactivos ====
+app.get('/api/reporte', (req, res) => {
+  try {
+    const usuario = req.query.usuario;
+    const users = readJsonSafe(PATHS.users, []);
+    const user = users.find(u => u.usuario === usuario);
+    if (!user || user.activo !== true) return res.json([]);
+    const all = readJsonSafe(PATHS.marcajes, []);
+    res.json(all.filter(x => x.usuario === usuario));
+  } catch (e) {
+    console.error('GET /api/reporte error:', e);
+    res.status(500).json([]);
+  }
+});
+
+app.get('/api/empleados', (req, res) => {
+  try {
+    const users = readJsonSafe(PATHS.users, []);
+    res.json(users.filter(u => u.activo !== false));
+  } catch (e) {
+    console.error('GET /api/empleados error:', e);
+    res.status(500).json([]);
+  }
+});
+
+app.get('/api/usuarios', (req, res) => {
+  try {
+    const users = readJsonSafe(PATHS.users, []);
+    const nombres = {};
+    users.forEach(u => { nombres[u.usuario] = u.nombre; });
+    res.json(nombres);
+  } catch (e) {
+    console.error('GET /api/usuarios error:', e);
+    res.status(500).json({});
+  }
+});
+
+app.get('/api/reporte-todos', (req, res) => {
+  try {
+    const all     = readJsonSafe(PATHS.marcajes, []);
+    const usuarios= readJsonSafe(PATHS.users, []);
+    const activos = new Set(usuarios.filter(u => u.activo !== false).map(u => u.usuario));
+    const filtrados = all.filter(m => activos.has(m.usuario));
+    filtrados.sort((a, b) => {
+      if (a.usuario !== b.usuario) return a.usuario.localeCompare(b.usuario);
+      if (a.fecha !== b.fecha)     return a.fecha.localeCompare(b.fecha);
+      return (a.hora || '').localeCompare(b.hora || '');
+    });
+    res.json(filtrados);
+  } catch (e) {
+    console.error('GET /api/reporte-todos error:', e);
+    res.status(500).json({ error: 'Error interno leyendo marcajes.' });
+  }
+});
+
+app.delete('/api/borrar-marcaje', (req, res) => {
+  try {
+    const { usuario, index } = req.body || {};
+    const all = readJsonSafe(PATHS.marcajes, []);
+    const regs = all.filter(m => m.usuario === usuario);
+    const item = regs[index];
+    if (!item) return res.json({ success: false });
+    const globalIdx = all.indexOf(item);
+    if (globalIdx === -1) return res.json({ success: false });
+    all.splice(globalIdx, 1);
+    writeJsonSafe(PATHS.marcajes, all);
+    res.json({ success: true });
+  } catch (e) {
+    console.error('DELETE /api/borrar-marcaje error:', e);
+    res.status(500).json({ success: false });
+  }
+});
+
 app.delete('/api/limpiar-marcajes', (req, res) => {
   try {
-    // Vaciar JSON
-    const p = PATHS.marcajes;
-    fs.writeFileSync(p, '[]', 'utf8');
-    // Vaciar tabla SQLite
-    db.run('DELETE FROM registros', [], err => {
-      if (err) console.error('Error borrando SQLite:', err.message);
+    writeJsonSafe(PATHS.marcajes, []);
+    db.run('DELETE FROM registros', [], (err) => {
+      if (err) console.error('SQLite borrar:', err.message);
       res.json({ success: true, mensaje: 'Todos los marcajes han sido borrados.' });
     });
-  } catch (err) {
-    console.error('Error en DELETE /api/limpiar-marcajes:', err);
+  } catch (e) {
+    console.error('DELETE /api/limpiar-marcajes error:', e);
     res.status(500).json({ success: false, mensaje: 'No se pudo borrar marcajes.' });
   }
 });
 
-// 2.11) Desactivar usuario
 app.post('/api/desactivar-usuario', (req, res) => {
-  const uPath = PATHS.users;
-  if (!fs.existsSync(uPath)) return res.json({ success: false });
-  const users = JSON.parse(fs.readFileSync(uPath, 'utf8'));
-  const idx   = users.findIndex(u => u.usuario === req.body.usuario);
-  if (idx === -1) return res.json({ success: false });
-  users[idx].activo = false;
-  fs.writeFileSync(uPath, JSON.stringify(users, null, 2), 'utf8');
-  res.json({ success: true });
+  try {
+    const users = readJsonSafe(PATHS.users, []);
+    const idx   = users.findIndex(u => u.usuario === req.body.usuario);
+    if (idx === -1) return res.json({ success: false });
+    users[idx].activo = false;
+    writeJsonSafe(PATHS.users, users);
+    res.json({ success: true });
+  } catch (e) {
+    console.error('POST /api/desactivar-usuario error:', e);
+    res.status(500).json({ success: false });
+  }
 });
 
-// 2.12) Eliminar usuario con fecha de baja
 app.post('/api/eliminar-usuario', (req, res) => {
-  const { usuario } = req.body;
-  const filePath = PATHS.users;
-
-  if (!fs.existsSync(filePath)) {
-    return res.json({ success: false, message: 'Archivo no encontrado' });
+  try {
+    const { usuario } = req.body || {};
+    const users = readJsonSafe(PATHS.users, []);
+    const index = users.findIndex(u => u.usuario === usuario);
+    if (index === -1) return res.json({ success: false, message: 'Usuario no encontrado' });
+    users[index].activo = false;
+    users[index].estado = 'Eliminado';
+    users[index].fecha_baja = new Date().toISOString();
+    writeJsonSafe(PATHS.users, users);
+    res.json({ success: true });
+  } catch (e) {
+    console.error('POST /api/eliminar-usuario error:', e);
+    res.status(500).json({ success: false });
   }
-
-  const users = JSON.parse(fs.readFileSync(filePath, 'utf8'));
-  const index = users.findIndex(u => u.usuario === usuario);
-
-  if (index === -1) {
-    return res.json({ success: false, message: 'Usuario no encontrado' });
-  }
-
-  users[index].activo = false;
-  users[index].estado = "Eliminado";
-  users[index].fecha_baja = new Date().toISOString(); // ← Fecha y hora actual
-
-  fs.writeFileSync(filePath, JSON.stringify(users, null, 2), 'utf8');
-  return res.json({ success: true });
 });
 
-// 2.13) Activar usuario
 app.post('/api/activar-usuario', (req, res) => {
-  const uPath = PATHS.users;
-  if (!fs.existsSync(uPath)) return res.json({ success: false });
-  const users = JSON.parse(fs.readFileSync(uPath, 'utf8'));
-  const u     = users.find(u => u.usuario === req.body.usuario);
-  if (!u) return res.json({ success: false });
-  u.activo = true;
-  fs.writeFileSync(uPath, JSON.stringify(users, null, 2), 'utf8');
-  res.json({ success: true });
+  try {
+    const users = readJsonSafe(PATHS.users, []);
+    const u     = users.find(u => u.usuario === req.body.usuario);
+    if (!u) return res.json({ success: false });
+    u.activo = true;
+    writeJsonSafe(PATHS.users, users);
+    res.json({ success: true });
+  } catch (e) {
+    console.error('POST /api/activar-usuario error:', e);
+    res.status(500).json({ success: false });
+  }
 });
 
-// 2.14) Corregir fecha y hora de un marcaje
 app.post('/api/corregir-hora', (req, res) => {
   try {
-    const p   = PATHS.marcajes;
-    const raw = fs.readFileSync(p, 'utf8').trim();
-    const all = raw ? JSON.parse(raw) : [];
+    const all  = readJsonSafe(PATHS.marcajes, []);
     const regs = all.filter(x => x.usuario === req.body.usuario);
     const item = regs[req.body.index];
     const idxG = all.indexOf(item);
@@ -515,76 +466,53 @@ app.post('/api/corregir-hora', (req, res) => {
     all[idxG].tipo  = req.body.tipo;
     all[idxG].fecha = req.body.fecha;
     all[idxG].hora  = req.body.hora;
-    fs.writeFileSync(p, JSON.stringify(all, null, 2), 'utf8');
+    writeJsonSafe(PATHS.marcajes, all);
     res.json({ success: true });
-  } catch (err) {
-    console.error('Error en POST /api/corregir-hora:', err);
+  } catch (e) {
+    console.error('POST /api/corregir-hora error:', e);
     res.json({ success: false });
   }
 });
 
 app.post('/api/agregar-marcaje', (req, res) => {
-  const { usuario, departamento, tipo, fecha, hora } = req.body;
-  const ip = req.ip;
+  try {
+    const { usuario, departamento, tipo, fecha, hora } = req.body || {};
+    const ip = getRealIp(req);
 
-  // Guardar en SQLite
-  const sql = `
-    INSERT INTO registros (usuario, tipo, fecha, hora, ip, departamento)
-    VALUES (?, ?, ?, ?, ?, ?)
-  `;
-  db.run(sql, [usuario, tipo, fecha, hora, ip, departamento], err => {
-    if (err) {
-      console.error('Error SQLite:', err.message);
-      return res.json({ success: false, mensaje: "Error al guardar en la base de datos." });
-    }
-
-    // También guardar en JSON
-    const p = PATHS.marcajes;
-    let all = [];
-    try {
-      const raw = fs.readFileSync(p, 'utf8').trim();
-      all = raw ? JSON.parse(raw) : [];
-    } catch (_) {
-      all = [];
-    }
-    all.push({ usuario, departamento, tipo, fecha, hora, ip });
-    fs.writeFileSync(p, JSON.stringify(all, null, 2), 'utf8');
-
-    res.json({ success: true, mensaje: "Registro agregado correctamente." });
-  });
+    db.run(
+      `INSERT INTO registros (usuario, tipo, fecha, hora, ip, departamento) VALUES (?, ?, ?, ?, ?, ?)`,
+      [usuario, tipo, fecha, hora, ip, departamento],
+      (err) => {
+        if (err) {
+          console.error('SQLite insertar manual:', err.message);
+          return res.json({ success: false, mensaje: 'Error al guardar en la base de datos.' });
+        }
+        const all = readJsonSafe(PATHS.marcajes, []);
+        all.push({ usuario, departamento, tipo, fecha, hora, ip });
+        writeJsonSafe(PATHS.marcajes, all);
+        res.json({ success: true, mensaje: 'Registro agregado correctamente.' });
+      }
+    );
+  } catch (e) {
+    console.error('POST /api/agregar-marcaje error:', e);
+    res.status(500).json({ success: false, mensaje: 'Error interno.' });
+  }
 });
 
-// 3) Servir estáticos desde /public
-app.use(express.static(path.join(__dirname, 'public')));
-
-// Ruta para obtener empleados inactivos y sus registros históricos
-
-
-// Ruta para obtener empleados inactivos y sus registros históricos (con fechas)
+// Empleados inactivos con historial
 app.get('/api/empleados-inactivos', (req, res) => {
-  const fsPath = PATHS.users;
-  let usuariosJSON = [];
-
-  if (fs.existsSync(fsPath)) {
-    usuariosJSON = JSON.parse(fs.readFileSync(fsPath, 'utf8'));
-  }
-
-  db.all(`SELECT DISTINCT usuario FROM registros`, [], (err, usuariosBD) => {
-    if (err) return res.status(500).json({ error: err.message });
-
-    const resultados = [];
-    let pendientes = usuariosBD.length;
-    if (pendientes === 0) return res.json([]);
-
-    usuariosBD.forEach(u => {
-      const usuarioBD = u.usuario;
-      const userMatch = usuariosJSON.find(j => j.usuario === usuarioBD);
-
-      if (!userMatch || userMatch.activo === false) {
-        db.all(
-          `SELECT * FROM registros WHERE usuario = ?`,
-          [usuarioBD],
-          (err2, rows) => {
+  try {
+    const usuariosJSON = readJsonSafe(PATHS.users, []);
+    db.all(`SELECT DISTINCT usuario FROM registros`, [], (err, usuariosBD) => {
+      if (err) return res.status(500).json({ error: err.message });
+      const resultados = [];
+      let pendientes = usuariosBD.length;
+      if (pendientes === 0) return res.json([]);
+      usuariosBD.forEach(u => {
+        const usuarioBD = u.usuario;
+        const userMatch = usuariosJSON.find(j => j.usuario === usuarioBD);
+        if (!userMatch || userMatch.activo === false) {
+          db.all(`SELECT * FROM registros WHERE usuario = ?`, [usuarioBD], (err2, rows) => {
             if (!err2 && rows.length > 0) {
               resultados.push({
                 nombre: userMatch?.nombre || usuarioBD,
@@ -597,32 +525,47 @@ app.get('/api/empleados-inactivos', (req, res) => {
             }
             pendientes--;
             if (pendientes === 0) res.json(resultados);
-          }
-        );
-      } else {
-        pendientes--;
-        if (pendientes === 0) res.json(resultados);
-      }
+          });
+        } else {
+          pendientes--;
+          if (pendientes === 0) res.json(resultados);
+        }
+      });
     });
-  });
+  } catch (e) {
+    console.error('GET /api/empleados-inactivos error:', e);
+    res.status(500).json({ error: 'Error interno' });
+  }
 });
 
-// 4) Iniciar servidor
-app.listen(PORT, () => {
-  console.log(`Servidor corriendo en http://localhost:${PORT}`);
-});
-
+// Reset de contraseña (nombre confuso, pero respeta tu endpoint actual)
 app.post('/api/reset-password-admin', (req, res) => {
-  const { usuario, nuevaClave } = req.body;
-  const uPath = PATHS.users;
-  if (!fs.existsSync(uPath)) return res.json({ success: false, message: "Archivo no encontrado" });
+  try {
+    const { usuario, nuevaClave } = req.body || {};
+    const users = readJsonSafe(PATHS.users, []);
+    const idx = users.findIndex(u => u.usuario === usuario);
+    if (idx === -1) return res.json({ success: false, message: 'Empleado no encontrado' });
+    users[idx].contrasena = nuevaClave;
+    writeJsonSafe(PATHS.users, users);
+    res.json({ success: true });
+  } catch (e) {
+    console.error('POST /api/reset-password-admin error:', e);
+    res.status(500).json({ success: false });
+  }
+});
 
-  const users = JSON.parse(fs.readFileSync(uPath, 'utf8'));
-  const idx = users.findIndex(u => u.usuario === usuario);
-  if (idx === -1) return res.json({ success: false, message: "Empleado no encontrado" });
+// ==== Manejador global de errores (último middleware) ====
+app.use((err, req, res, next) => {
+  console.error('🔥 Error no controlado:', err);
+  res.status(500).json({ ok: false, error: 'server_error' });
+});
 
-  users[idx].contrasena = nuevaClave;
-  fs.writeFileSync(uPath, JSON.stringify(users, null, 2), 'utf8');
-  res.json({ success: true });
+// Evita que errores no manejados tumben el proceso
+process.on('unhandledRejection', err => console.error('UNHANDLED REJECTION', err));
+process.on('uncaughtException', err => console.error('UNCAUGHT EXCEPTION', err));
+
+// ==== Arranque ====
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`DinEX WebClock escuchando en puerto ${PORT}`);
 });
 
