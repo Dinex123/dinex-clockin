@@ -9,35 +9,59 @@
   <div class="contenedor">
     <img src="logo-dinex.png" alt="Logo DinEX" class="logo">
     <h1>Acceso Usuario</h1>
-    <form id="loginForm">
-      <input type="text" id="usuario" placeholder="Usuario" required><br><br>
+
+    <form id="loginForm" autocomplete="off">
+      <input type="text" id="usuario" placeholder="Usuario" required autofocus><br><br>
       <input type="password" id="contrasena" placeholder="Contraseña" required><br><br>
-      <button type="submit" class="boton">Iniciar Sesión</button>
-      <p id="error" style="color:red;"></p>
+      <button type="submit" id="btnLogin" class="boton">Iniciar Sesión</button>
+      <p id="error" style="color:red; margin-top:10px;"></p>
     </form>
   </div>
 
+  <!-- 1) Utilidades compartidas -->
+  <script src="common.js"></script>
+
+  <!-- 2) Lógica de esta página -->
   <script>
-    document.getElementById('loginForm').addEventListener('submit', async function(e) {
+    const form = document.getElementById('loginForm');
+    const btn  = document.getElementById('btnLogin');
+    const err  = document.getElementById('error');
+    const inpUser = document.getElementById('usuario');
+    const inpPass = document.getElementById('contrasena');
+
+    form.addEventListener('submit', async (e) => {
       e.preventDefault();
-      const usuario = document.getElementById('usuario').value;
-      const contrasena = document.getElementById('contrasena').value;
+      err.textContent = '';
 
-      const response = await fetch('/api/login-usuario', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ usuario, contrasena })
-      });
+      const usuario    = inpUser.value.trim();
+      const contrasena = inpPass.value;
 
-      const result = await response.json();
-      if (result.success) {
-        // Guardamos usuario y departamento en sessionStorage
-        sessionStorage.setItem("usuario", usuario);
-        sessionStorage.setItem("departamento", result.departamento);
-        // Redirigimos al panel de usuario
-        window.location.href = 'usuario.html';
-      } else {
-        document.getElementById('error').textContent = 'Credenciales incorrectas';
+      if (!usuario || !contrasena) {
+        err.textContent = 'Ingresa usuario y contraseña.';
+        return;
+      }
+
+      try {
+        btn.disabled = true;
+        btn.textContent = 'Ingresando...';
+
+        // Usamos postJSON de common.js (maneja 502/no-JSON)
+        const result = await postJSON('/api/login-usuario', { usuario, contrasena });
+
+        if (result && result.success) {
+          // Guardar sesión y redirigir
+          sessionStorage.setItem('usuario', usuario);
+          sessionStorage.setItem('departamento', result.departamento || '');
+          window.location.href = 'usuario.html';
+        } else {
+          err.textContent = 'Credenciales incorrectas';
+        }
+      } catch (ex) {
+        console.error(ex);
+        err.textContent = ex.message || 'No se pudo iniciar sesión. Intenta de nuevo.';
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Iniciar Sesión';
       }
     });
   </script>

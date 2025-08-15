@@ -9,19 +9,25 @@
   <div class="contenedor">
     <img src="logo-dinex.png" alt="Logo DinEX" class="logo">
     <h1>Panel del Usuario</h1>
+
     <div class="botones">
       <button onclick="registrar('entrada')" class="boton">Entrada</button>
       <button onclick="registrar('salida_lunch')" class="boton">Lunch Out</button>
       <button onclick="registrar('entrada_lunch')" class="boton">Lunch In</button>
       <button onclick="registrar('salida')" class="boton">Salida</button>
-      <a href="index.html" class="boton">Cerrar Sesión</a>
+      <!-- Antes era un enlace a index.html. Ahora cerramos sesión del lado del cliente. -->
+      <button type="button" class="boton danger" onclick="cerrarSesion()">Cerrar Sesión</button>
     </div>
 
     <p id="mensaje" style="margin-top: 20px;"></p>
   </div>
 
+  <!-- 1) Cargamos utilidades compartidas -->
+  <script src="common.js"></script>
+
+  <!-- 2) Lógica propia de esta página -->
   <script>
-     // ⚙️ Opciones de geolocalización
+  // ⚙️ Opciones de geolocalización
   const GEO_OPTS = { enableHighAccuracy: false, timeout: 8000, maximumAge: 0 };
 
   // Obtiene {lat, lng, accuracy} con una Promesa
@@ -75,17 +81,10 @@
 
       mensajeEl.textContent = "Registrando marcaje…";
 
-      // 2) Enviar al servidor con la ubicación
-      const res = await fetch("/api/marcar", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ usuario, tipo, departamento, location })
-      });
+      // 2) Enviar al servidor usando postJSON (desde common.js)
+      const data = await postJSON("/api/marcar", { usuario, tipo, departamento, location });
 
-      const data = await res.json();
-
-      if (!res.ok || data.success === false) {
-        // puede venir 400/403 del servidor o success:false
+      if (data.success === false) {
         throw new Error(data.mensaje || "No se pudo registrar el marcaje.");
       }
 
@@ -105,29 +104,21 @@
   let tiempoInactividad;
   function reiniciarTemporizador() {
     clearTimeout(tiempoInactividad);
-    tiempoInactividad = setTimeout(cerrarSesionPorInactividad, 30 * 60 * 1000); // 30 minutos
+    tiempoInactividad = setTimeout(() => {
+      alert("Sesión cerrada por inactividad.");
+      cerrarSesion(); // usa la función global de common.js
+    }, 30 * 60 * 1000); // 30 minutos
   }
-  function cerrarSesionPorInactividad() {
-    alert("Sesión cerrada por inactividad.");
-    sessionStorage.clear();
-    window.location.href = "usuario-login.html";
-  }
-  ["click", "mousemove", "keypress", "scroll"].forEach(evt => {
-    document.addEventListener(evt, reiniciarTemporizador);
+
+  ["click", "mousemove", "keypress", "scroll", "touchstart"].forEach(evt => {
+    document.addEventListener(evt, reiniciarTemporizador, { passive: true });
   });
   reiniciarTemporizador();
   </script>
 
   <style>
-    .boton.danger {
-      background: #ea1902;
-    }
-
-    .botones {
-      text-align: center;
-      margin: 20px 0;
-    }
-
+    .boton.danger { background: #ea1902; }
+    .botones { text-align: center; margin: 20px 0; }
     .boton {
       background-color: #ec008c;
       color: white;
@@ -138,10 +129,7 @@
       cursor: pointer;
       transition: background 0.3s ease;
     }
-
-    .boton:hover {
-      background-color: #c60074;
-    }
+    .boton:hover { background-color: #c60074; }
 
     table.dinex-table {
       width: 90%;
@@ -151,47 +139,21 @@
       text-align: center;
       box-shadow: 0 0 5px rgba(0,0,0,0.1);
     }
-
     table.dinex-table th {
       background-color: #ec008c;
       color: white;
       padding: 10px;
       font-weight: bold;
     }
+    table.dinex-table td { padding: 8px; }
+    table.dinex-table tr:nth-child(even) { background-color: #fce8f3; }
+    table.dinex-table tr:hover { background-color: #fff0fa; }
 
-    table.dinex-table td {
-      padding: 8px;
-    }
+    h1 { text-align: center; margin-bottom: 10px; color: #85b200; }
+    label { margin: 0 10px; }
 
-    table.dinex-table tr:nth-child(even) {
-      background-color: #fce8f3;
-    }
-
-    table.dinex-table tr:hover {
-      background-color: #fff0fa;
-    }
-
-    h1 {
-      text-align: center;
-      margin-bottom: 10px;
-      color: #85b200;
-    }
-
-    label {
-      margin: 0 10px;
-    }
-
-    .contenedor {
-      max-width: 1100px;
-      margin: auto;
-      padding: 20px;
-    }
-
-    .logo {
-      display: block;
-      margin: 0 auto 10px auto;
-      max-width: 220px;
-    }
+    .contenedor { max-width: 1100px; margin: auto; padding: 20px; }
+    .logo { display: block; margin: 0 auto 10px auto; max-width: 220px; }
   </style>
 </body>
 </html>

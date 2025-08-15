@@ -46,6 +46,16 @@ const db = new sqlite3.Database(PATHS.dbFile);
 
 // 1) Middleware para parsear JSON
 app.use(bodyParser.json());
+
+// === Endpoints de salud y prueba ===
+app.get('/healthz', (req, res) => {
+  res.status(200).send('OK');
+});
+
+app.get('/api/ping', (req, res) => {
+  res.json({ ok: true, time: new Date().toISOString() });
+});
+
 // ====== Geocerca (configura tu sede) ======
 //Coordenadas de la oficina (Google Maps)
 const OFFICES = [

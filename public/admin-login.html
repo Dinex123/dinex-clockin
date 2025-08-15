@@ -1,38 +1,63 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8">
+  <meta charset="UTF-8" />
   <title>Login Administrador</title>
-  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="style.css" />
 </head>
 <body>
   <div class="contenedor">
-    <img src="logo-dinex.png" alt="Logo DinEX" class="logo">
+    <img src="logo-dinex.png" alt="Logo DinEX" class="logo" />
     <h1>Acceso Administrador</h1>
-    <form id="loginForm">
-      <input type="text" id="username" placeholder="Usuario" required><br><br>
-      <input type="password" id="password" placeholder="Contraseña" required><br><br>
-      <button type="submit" class="boton">Iniciar Sesión</button>
-      <p id="error" style="color:red;"></p>
+
+    <form id="loginForm" autocomplete="off">
+      <input type="text" id="username" placeholder="Usuario" required autofocus /><br /><br />
+      <input type="password" id="password" placeholder="Contraseña" required /><br /><br />
+      <button type="submit" id="btnLogin" class="boton">Iniciar Sesión</button>
+      <p id="error" style="color:red; margin-top:10px;"></p>
     </form>
   </div>
+
+  <!-- Utilidades compartidas (postJSON, mostrarMensaje, cerrarSesion) -->
+  <script src="common.js"></script>
+
   <script>
-    document.getElementById('loginForm').addEventListener('submit', async function(e) {
+    const form = document.getElementById('loginForm');
+    const btn  = document.getElementById('btnLogin');
+    const err  = document.getElementById('error');
+    const inpUser = document.getElementById('username');
+    const inpPass = document.getElementById('password');
+
+    form.addEventListener('submit', async (e) => {
       e.preventDefault();
-      const username = document.getElementById('username').value;
-      const password = document.getElementById('password').value;
+      err.textContent = '';
 
-      const response = await fetch('/api/admin-login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password })
-      });
+      const username = inpUser.value.trim();
+      const password = inpPass.value;
 
-      const result = await response.json();
-      if (result.success) {
-        window.location.href = 'admin.html';
-      } else {
-        document.getElementById('error').textContent = 'Credenciales incorrectas';
+      if (!username || !password) {
+        err.textContent = 'Ingresa usuario y contraseña.';
+        return;
+      }
+
+      try {
+        btn.disabled = true;
+        btn.textContent = 'Ingresando...';
+
+        // postJSON viene de common.js y tolera respuestas no-JSON/502
+        const result = await postJSON('/api/admin-login', { username, password });
+
+        if (result && result.success) {
+          window.location.href = 'admin.html';
+        } else {
+          err.textContent = 'Credenciales incorrectas';
+        }
+      } catch (ex) {
+        console.error(ex);
+        err.textContent = ex.message || 'No se pudo iniciar sesión. Intenta de nuevo.';
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Iniciar Sesión';
       }
     });
   </script>
