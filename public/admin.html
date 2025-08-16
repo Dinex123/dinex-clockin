@@ -1,126 +1,86 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8">
+  <meta charset="UTF-8" />
   <title>Panel de Administración</title>
-  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="style.css" />
   <script src="https://unpkg.com/lucide@latest"></script>
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      background-color: white;
-      margin: 0;
-      padding: 0;
-    }
 
-    .contenedor {
-      max-width: 1200px;
+  <style>
+    /* Base existente */
+    body{
+      font-family: Arial, sans-serif;
+      background-color: #fff;
+      margin:0; padding:0;
+    }
+    .contenedor{
+      max-width: 1100px;
       margin: 0 auto;
-      padding: 20px;
+      padding: 18px 16px;
       text-align: center;
     }
+    .logo{ max-width: 190px; margin: 8px auto 14px; display:block; }
+    h1{ color:#84a900; margin: 8px 0 16px; }
 
-    .logo {
-      max-width: 200px;
-      margin: 10px auto 20px;
-      display: block;
+    .menu{
+      display:flex; justify-content:center; flex-wrap:wrap; gap:6px;
+      margin-bottom:10px;
     }
+    .submenu{ position:relative; display:inline-block; }
+    .boton{
+      background:#ec008c; color:#fff; padding:12px 16px; border:0; border-radius:8px;
+      font-size:16px; cursor:pointer; width:200px; display:flex; align-items:center; justify-content:center; gap:8px;
+      transition:background .2s;
+    }
+    .boton:hover{ background:#c60074; }
+    .boton svg{ width:20px; height:20px; stroke:#fff; }
 
-    h1 {
-      color: #84a900;
-      margin-bottom: 20px;
+    /* Dropdown: ancho auto + sin salto de línea para alinear “Empleados Inactivos” */
+    .submenu-contenido{
+      display:none; position:absolute; background:#fff; border-radius:6px; padding:8px 0; z-index:10;
+      width:auto; min-width:230px; /* <- antes 200px */
+      top:100%; left:0; box-shadow:0 2px 10px rgba(0,0,0,.1);
     }
+    .submenu-contenido a{
+      color:#ec008c; padding:10px 15px; text-decoration:none; display:flex; align-items:center; gap:8px; font-size:15px;
+      white-space:nowrap; /* <- evita que el texto se parta */
+    }
+    .submenu-contenido a:hover{ background:#f9e4f1; }
+    .submenu:hover .submenu-contenido{ display:block; }
 
-    .menu {
-      display: flex;
-      justify-content: center;
-      flex-wrap: wrap;
-      gap: 5px;
+    /* ===== Dashboard (tamaño un poco más pequeño) ===== */
+    #resumen{ max-width: 900px; margin: 12px auto 20px; }
+    .dash-wrap{
+      display:grid; grid-template-columns:1.15fr 1fr; gap:14px; align-items:stretch;
     }
+    @media (max-width: 900px){ .dash-wrap{ grid-template-columns: 1fr; } }
 
-    .submenu {
-      position: relative;
-      display: inline-block;
+    .dash-card{
+      background:#fff; border:1px solid #e5e7eb; border-radius:16px;
+      padding:10px 10px 6px; box-shadow:0 2px 10px rgba(0,0,0,.05);
     }
+    .dash-title{ margin:6px 6px 10px; color:#84a900; font-weight:700; font-size:18px; }
 
-    .boton {
-      background: #ec008c;
-      color: white;
-      padding: 14px 18px;
-      border: none;
-      border-radius: 8px;
-      font-size: 16px;
-      cursor: pointer;
-      width: 200px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 8px;
-      transition: background 0.2s, color 0.2s;
+    .dash-grid{ display:grid; grid-template-columns:1fr; gap:8px; }
+    .kpi{
+      position:relative;
+      border-radius:12px; padding:10px 12px; border:1px solid #e5e7eb;
+      display:flex; justify-content:space-between; align-items:center;
     }
+    .kpi .label{ font-size:13px; opacity:.9; }
+    .kpi .value{ font-weight:800; font-size:24px; }
 
-    .boton:hover {
-      background: #c60074;
-    }
+    .kpi--work  { background:#f7fff0; border-top:3px solid #84a900; }
+    .kpi--lunch { background:#fff7f0; border-top:3px solid #f59e0b; }
+    .kpi--off   { background:#fff1f6; border-top:3px solid #d61f69; }
+    .kpi--total { background:#f3f4f6; border-top:3px solid #9ca3af; }
 
-    .boton:hover svg {
-      stroke: #fff;
-    }
-
-    .boton svg {
-      width: 20px;
-      height: 20px;
-      stroke: white;
-      transition: stroke 0.2s;
-    }
-
-    .submenu-contenido {
-      display: none;
-      position: absolute;
-      background-color: white;
-      border-radius: 6px;
-      padding: 8px 0;
-      z-index: 1;
-      width: 200px;
-      top: 100%;
-      left: 0;
-      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-    }
-
-    .submenu-contenido a {
-      color: #ec008c;
-      padding: 10px 15px;
-      text-decoration: none;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      font-size: 15px;
-      transition: background 0.2s;
-    }
-
-    .submenu-contenido a:hover {
-      background-color: #f9e4f1;
-    }
-
-    .submenu-contenido a svg {
-      width: 18px;
-      height: 18px;
-      stroke: #ec008c;
-      transition: stroke 0.2s;
-    }
-
-    .submenu-contenido a:hover svg {
-      stroke: #c60074;
-    }
-
-    .submenu:hover .submenu-contenido {
-      display: block;
-    }
+    #chartEstado{ margin-bottom:6px; }
   </style>
 </head>
 <body>
   <div class="contenedor">
-    <img src="logo-dinex.png" alt="Logo DinEX" class="logo">
+    <img src="logo-dinex.png" alt="Logo DinEX" class="logo" />
     <h1>Panel de Administración</h1>
 
     <div class="menu">
@@ -148,34 +108,133 @@
         <div class="submenu-contenido">
           <a href="empleados.html"><i data-lucide="users"></i>Usuarios</a>
           <a href="empleados_inactivos.html"><i data-lucide="user-x"></i>Empleados Inactivos</a>
-          <a href="#" onclick="cerrarSesion()"><i data-lucide="log-out"></i>Cerrar Sesión</a>
+          <a href="#" id="btnLogout"><i data-lucide="log-out"></i>Cerrar Sesión</a>
         </div>
       </div>
     </div>
+
+    <!-- ===== Dashboard resumen del día ===== -->
+    <section id="resumen">
+      <div class="dash-wrap">
+        <div class="dash-card">
+          <h3 class="dash-title">Estado del día</h3>
+          <canvas id="chartEstado" height="150" aria-label="Estado del día"></canvas>
+        </div>
+
+        <div class="dash-grid">
+          <div id="kpiWork"  class="kpi kpi--work"  title="">
+            <div class="label">Trabajando</div>
+            <div id="kpiTrabajando" class="value">0</div>
+          </div>
+          <div id="kpiLunch" class="kpi kpi--lunch" title="">
+            <div class="label">En almuerzo</div>
+            <div id="kpiAlmuerzo"   class="value">0</div>
+          </div>
+          <div id="kpiOff"   class="kpi kpi--off"   title="">
+            <div class="label">No trabajando</div>
+            <div id="kpiNo"         class="value">0</div>
+          </div>
+          <div id="kpiTotal" class="kpi kpi--total" title="">
+            <div class="label">Activos</div>
+            <div id="kpiActivos"    class="value" style="font-size:20px;">0</div>
+          </div>
+        </div>
+      </div>
+    </section>
+    <!-- ===== /Dashboard ===== -->
   </div>
 
   <script>
     lucide.createIcons();
 
-    // ⏳ SISTEMA DE CIERRE POR INACTIVIDAD (30 MINUTOS)
+    // 🔒 Cierre por inactividad (30 min)
     let tiempoInactividad;
-
-    function reiniciarTemporizador() {
-      clearTimeout(tiempoInactividad);
-      tiempoInactividad = setTimeout(cerrarSesionPorInactividad, 30 * 60 * 1000); // 30 minutos
-    }
-
-    function cerrarSesionPorInactividad() {
+    function cerrarSesionPorInactividad(){
       alert("Sesión cerrada por inactividad.");
       sessionStorage.clear();
       window.location.href = "admin-login.html";
     }
-
-    ['click', 'mousemove', 'keypress', 'scroll'].forEach(evt => {
-      document.addEventListener(evt, reiniciarTemporizador);
-    });
-
+    function reiniciarTemporizador(){
+      clearTimeout(tiempoInactividad);
+      tiempoInactividad = setTimeout(cerrarSesionPorInactividad, 30*60*1000);
+    }
+    ['click','mousemove','keypress','scroll','touchstart'].forEach(e =>
+      document.addEventListener(e, reiniciarTemporizador)
+    );
     reiniciarTemporizador();
+
+    // Logout desde menú
+    document.getElementById('btnLogout').addEventListener('click', (e) => {
+      e.preventDefault();
+      sessionStorage.clear();
+      window.location.href = "admin-login.html";
+    });
+  </script>
+
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+
+  <!-- Lógica del dashboard -->
+  <script>
+    document.addEventListener('DOMContentLoaded', async () => {
+      try {
+        const resp = await fetch('/api/resumen-estado-hoy');
+        const d = await resp.json();
+
+        // KPIs (conteos)
+        const nWork  = d.trabajando    ?? 0;
+        const nLunch = d.enAlmuerzo    ?? 0;
+        const nOff   = d.noTrabajando  ?? 0;
+        const nAct   = d.totalActivos  ?? 0;
+
+        document.getElementById('kpiTrabajando').textContent = nWork;
+        document.getElementById('kpiAlmuerzo').textContent   = nLunch;
+        document.getElementById('kpiNo').textContent         = nOff;
+        document.getElementById('kpiActivos').textContent    = nAct;
+
+        // Tooltips con nombres (solo al pasar el mouse)
+        const listas = d.listas || {};
+        const fmt = (arr) => {
+          if (!arr || !arr.length) return '—';
+          return 'Nombres:\n- ' + arr.join('\n- ');
+        };
+        document.getElementById('kpiWork').title  = fmt(listas.trabajando);
+        document.getElementById('kpiLunch').title = fmt(listas.enAlmuerzo);
+        document.getElementById('kpiOff').title   = fmt(listas.noTrabajando);
+        document.getElementById('kpiTotal').title = fmt(listas.activos);
+
+        // Gráfica dona
+        const ctx = document.getElementById('chartEstado');
+        if (ctx) {
+          new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+              labels: ['Trabajando', 'En almuerzo', 'No trabajando'],
+              datasets: [{
+                data: [nWork, nLunch, nOff],
+                backgroundColor: ['#84a900', '#f59e0b', '#9ca3af'],
+                borderColor: '#ffffff',
+                borderWidth: 2
+              }]
+            },
+            options: {
+              responsive: true,
+              cutout: '58%',
+              plugins: {
+                legend: { position: 'bottom', labels: { usePointStyle: true } },
+                tooltip: {
+                  callbacks: {
+                    label: (ctx) => `${ctx.label}: ${ctx.parsed}`
+                  }
+                }
+              }
+            }
+          });
+        }
+      } catch (err) {
+        console.error('Error cargando resumen:', err);
+      }
+    });
   </script>
 
   <!-- Helpers comunes -->

@@ -111,7 +111,7 @@ app.get('/health',  (req, res) => res.send('ok'));
 app.get('/healthz', (req, res) => res.send('OK'));
 app.get('/api/ping', (req, res) => res.json({ ok: true, time: new Date().toISOString() }));
 
-// ====== Geocerca (configura tu sede) ======
+// ====== Geocerca (Informacion de las sucursales Lat, Long) ======
 const OFFICES = [
   { id: 'TX-116',  name: 'Sede 1 - Quickstop',  lat: 29.71694, lng: -95.48804, radiusMeters: 150 },
   { id: 'TX-117',  name: 'Sede 2 - Rosemberg',  lat: 29.57039, lng: -95.77575, radiusMeters: 150 },
@@ -459,8 +459,8 @@ app.post('/api/activar-usuario', (req, res) => {
 app.post('/api/corregir-hora', (req, res) => {
   try {
     const all  = readJsonSafe(PATHS.marcajes, []);
-    const regs = all.filter(x => x.usuario === req.body.usuario);
-    const item = regs[req.body.index];
+    theRegs = all.filter(x => x.usuario === req.body.usuario);
+    const item = theRegs[req.body.index];
     const idxG = all.indexOf(item);
     if (idxG < 0) throw new Error('Índice inválido');
     all[idxG].tipo  = req.body.tipo;
@@ -499,58 +499,63 @@ app.post('/api/agregar-marcaje', (req, res) => {
   }
 });
 
-// Empleados inactivos con historial
-app.get('/api/empleados-inactivos', (req, res) => {
+// === Dashboard: resumen de estado de hoy (con listas de nombres para tooltips) ===
+app.get('/api/resumen-estado-hoy', (req, res) => {
   try {
-    const usuariosJSON = readJsonSafe(PATHS.users, []);
-    db.all(`SELECT DISTINCT usuario FROM registros`, [], (err, usuariosBD) => {
-      if (err) return res.status(500).json({ error: err.message });
-      const resultados = [];
-      let pendientes = usuariosBD.length;
-      if (pendientes === 0) return res.json([]);
-      usuariosBD.forEach(u => {
-        const usuarioBD = u.usuario;
-        const userMatch = usuariosJSON.find(j => j.usuario === usuarioBD);
-        if (!userMatch || userMatch.activo === false) {
-          db.all(`SELECT * FROM registros WHERE usuario = ?`, [usuarioBD], (err2, rows) => {
-            if (!err2 && rows.length > 0) {
-              resultados.push({
-                nombre: userMatch?.nombre || usuarioBD,
-                departamento: userMatch?.departamento || '-',
-                estado: userMatch?.estado || 'Desactivado',
-                fecha_creacion: userMatch?.fecha_creacion || null,
-                fecha_baja: userMatch?.fecha_baja || null,
-                registros: rows
-              });
-            }
-            pendientes--;
-            if (pendientes === 0) res.json(resultados);
-          });
-        } else {
-          pendientes--;
-          if (pendientes === 0) res.json(resultados);
-        }
-      });
+    const usuarios = readJsonSafe(PATHS.users, []);
+    const activosUsers = usuarios.filter(u => u.activo !== false);
+    const activos = activosUsers.map(u => u.usuario);
+    const nameByUser = new Map(activosUsers.map(u => [u.usuario, u.nombre || u.usuario]));
+
+    const all = readJsonSafe(PATHS.marcajes, []);
+    const now = moment().tz('America/Chicago');
+    const fechaHoy = now.format('YYYY-MM-DD');
+
+    // Agrupar marcajes de hoy por usuario activo
+    const porUsuario = new Map();
+    for (const u of activos) porUsuario.set(u, []);
+    for (const m of all) {
+      if (porUsuario.has(m.usuario) && m.fecha === fechaHoy) porUsuario.get(m.usuario).push(m);
+    }
+
+    // Clasificación por último marcaje del día
+    const ENTRA = new Set(['entrada', 'entrada_lunch']);
+    const SALE_ALMUERZO = 'salida_lunch';
+
+    const trabajandoNombres   = [];
+    const enAlmuerzoNombres   = [];
+    const noTrabajandoNombres = [];
+
+    for (const [usuario, regs] of porUsuario.entries()) {
+      const nombre = nameByUser.get(usuario) || usuario;
+
+      if (!regs.length) { noTrabajandoNombres.push(nombre); continue; }
+      regs.sort((a, b) => (a.hora || '').localeCompare(b.hora || ''));
+      const ult = regs[regs.length - 1];
+
+      if (ult && ult.tipo === SALE_ALMUERZO) enAlmuerzoNombres.push(nombre);
+      else if (ult && ENTRA.has(ult.tipo))   trabajandoNombres.push(nombre);
+      else                                    noTrabajandoNombres.push(nombre);
+    }
+
+    const activosNombres = activosUsers.map(u => u.nombre || u.usuario);
+
+    res.json({
+      fecha: fechaHoy,
+      totalActivos: activos.length,
+      trabajando:   trabajandoNombres.length,
+      enAlmuerzo:   enAlmuerzoNombres.length,
+      noTrabajando: noTrabajandoNombres.length,
+      listas: {
+        trabajando:   trabajandoNombres,
+        enAlmuerzo:   enAlmuerzoNombres,
+        noTrabajando: noTrabajandoNombres,
+        activos:      activosNombres
+      }
     });
   } catch (e) {
-    console.error('GET /api/empleados-inactivos error:', e);
-    res.status(500).json({ error: 'Error interno' });
-  }
-});
-
-// Reset de contraseña (usa users.json)
-app.post('/api/reset-password-admin', (req, res) => {
-  try {
-    const { usuario, nuevaClave } = req.body || {};
-    const users = readJsonSafe(PATHS.users, []);
-    const idx = users.findIndex(u => u.usuario === usuario);
-    if (idx === -1) return res.json({ success: false, message: 'Empleado no encontrado' });
-    users[idx].contrasena = nuevaClave;
-    writeJsonSafe(PATHS.users, users);
-    res.json({ success: true });
-  } catch (e) {
-    console.error('POST /api/reset-password-admin error:', e);
-    res.status(500).json({ success: false });
+    console.error('GET /api/resumen-estado-hoy error:', e);
+    res.status(500).json({ error: 'internal_error' });
   }
 });
 

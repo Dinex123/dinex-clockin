@@ -1,12 +1,28 @@
+/* =========================
+   Variables de marca
+   ========================= */
+:root{
+  --pink: #EC008C;
+  --pink-dark: #b4006d;
+  --green: #84ae05;
+  --text: #333;
+  --border: #ccc;
+}
+
+/* =========================
+   Base
+   ========================= */
 body {
   background-color: #ffffff;
   font-family: Arial, sans-serif;
   text-align: center;
-  color: #333;
+  color: var(--text);
 }
 
 .contenedor {
-  margin-top: 50px;
+  max-width: 800px;         /* unificado */
+  margin: 50px auto 0;      /* centrado + margen superior */
+  padding: 0 16px;
 }
 
 .logo {
@@ -15,7 +31,7 @@ body {
 }
 
 h1 {
-  color: #84ae05;
+  color: var(--green);
   font-size: 32px;
 }
 
@@ -23,24 +39,35 @@ h1 {
   margin-top: 30px;
 }
 
+/* =========================
+   Botones (estándar)
+   ========================= */
 .boton {
   display: inline-block;
-  background-color: #EC008C;
-  color: white;
+  background-color: var(--pink);
+  color: #fff;
   padding: 15px 25px;
   margin: 10px;
   text-decoration: none;
   font-size: 18px;
   border-radius: 8px;
-  transition: background 0.3s;
+  transition: background .3s;
+  border: none;
+  cursor: pointer;
 }
 
 .boton:hover {
-  background-color: #b4006d;
+  background-color: var(--pink-dark);
 }
-/* =========================================
+
+/* Variante de peligro */
+.boton.danger {
+  background: #ea1902;
+}
+
+/* =========================
    Tarjetas (cards)
-   ========================================= */
+   ========================= */
 .card {
   background: #fff;
   padding: 20px;
@@ -49,7 +76,6 @@ h1 {
   box-shadow: 0 2px 6px rgba(0,0,0,0.1);
 }
 
-/* Título secundario dentro de la card */
 .card-title {
   margin-top: 0;
   margin-bottom: 20px;
@@ -57,9 +83,9 @@ h1 {
   color: #333;
 }
 
-/* =========================================
+/* =========================
    Formularios
-   ========================================= */
+   ========================= */
 .form-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -84,15 +110,14 @@ h1 {
   font-size: 0.95rem;
 }
 
-/* Botones dentro de formularios alineados a la derecha */
 .form-actions {
   grid-column: 1 / -1;
   text-align: right;
 }
 
-/* =========================================
+/* =========================
    Inline form (búsqueda)
-   ========================================= */
+   ========================= */
 .form-inline {
   display: flex;
   gap: 10px;
@@ -105,86 +130,105 @@ h1 {
   color: #333;
 }
 
-/* =========================================
-   Mensaje de respuesta
-   ========================================= */
+/* =========================
+   Mensajes
+   ========================= */
 .mensaje {
   margin-top: 15px;
   font-weight: 600;
 }
-.boton {
-  display: inline-block;
-  padding: 8px 16px;
-  font-size: 14px;
-  text-align: center;
-  border: none;
-  border-radius: 8px;
-  cursor: pointer;
-  background: #e6007e;
-  color: #fff;
-}
-/* Botón “Eliminar” */
-.boton.danger {
-  background: #ea1902;
-}
-/* Dentro de la tabla, tamaños aún más ajustados */
-#resultado table button {
-  width: auto;
-  padding: 6px 12px;
-  font-size: 13px;
-}
-/* Tabla compacta en “Corregir Horas” */
-#resultado table {
-  width: auto;
-  max-width: 90%;
-  margin: 0 auto;
-  font-size: 14px;
-  border-collapse: collapse;
-}
-#resultado table th,
-#resultado table td {
-  padding: 6px 8px;
-  border: 1px solid #ccc;
-}
-/* Inputs y selects más pequeños */
-#resultado table input,
-#resultado table select {
-  font-size: 13px;
-  padding: 4px 6px;
-}
-/* Botones en la tabla */
-#resultado table button {
-  font-size: 13px;
-  padding: 6px 12px;
-}
-/* 1. Limita el ancho general y centra todo */
-.contenedor {
-  max-width: 800px;    /* ajusta este valor al ancho de tus botones */
-  margin: 0 auto;
-  padding: 0 16px;
-}
 
-/* 2. Haz que la tabla use el 100% dentro del contenedor */
+/* =========================
+   Tabla de "Corregir Horas"
+   ========================= */
 #resultado table {
   width: 100%;
+  max-width: 90%;
+  margin: 0 auto;
   border-collapse: collapse;
   font-size: 14px;
 }
 
-/* 3. Ajusta el padding para filas más compactas */
 #resultado table th,
 #resultado table td {
   padding: 6px 8px;
-  border: 1px solid #ccc;
+  border: 1px solid var(--border);
 }
 
-/* 4. Inputs y botones en la tabla más pequeños */
 #resultado table input,
 #resultado table select {
   font-size: 13px;
   padding: 4px 6px;
 }
+
 #resultado table button {
-  font-size: 13px;
+  width: auto;
   padding: 6px 12px;
+  font-size: 13px;
 }
+
+/* =================================================================
+   ADMIN – menú desplegable (fix de alineado y ancho del dropdown)
+   ================================================================= */
+.submenu { position: relative; }
+.submenu-contenido{
+  display: none;
+  position: absolute;
+  background: #fff;
+  border-radius: 6px;
+  padding: 8px 0;
+  z-index: 10;
+  width: auto;           /* antes 200px */
+  min-width: 230px;      /* cabe “Empleados Inactivos” */
+  top: 100%;
+  left: 0;
+  box-shadow: 0 2px 10px rgba(0,0,0,.1);
+}
+.submenu:hover .submenu-contenido{ display: block; }
+.submenu-contenido a{
+  color: var(--pink);
+  padding: 10px 15px;
+  text-decoration: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 15px;
+  white-space: nowrap;   /* evita salto de línea */
+}
+.submenu-contenido a:hover{ background: #f9e4f1; }
+
+/* =================================================================
+   ADMIN – Dashboard compacto (por si prefieres tenerlo en CSS)
+   ================================================================= */
+#resumen{ max-width: 900px; margin: 12px auto 20px; }
+.dash-wrap{
+  display: grid;
+  grid-template-columns: 1.15fr 1fr;
+  gap: 14px;
+  align-items: stretch;
+}
+@media (max-width: 900px){
+  .dash-wrap{ grid-template-columns: 1fr; }
+}
+.dash-card{
+  background:#fff; border:1px solid #e5e7eb; border-radius:16px;
+  padding:10px 10px 6px; box-shadow:0 2px 10px rgba(0,0,0,.05);
+}
+.dash-title{
+  margin:6px 6px 10px; color:#84a900; font-weight:700; font-size:18px;
+}
+.dash-grid{ display:grid; grid-template-columns:1fr; gap:8px; }
+.kpi{
+  position:relative;
+  border-radius:12px; padding:10px 12px; border:1px solid #e5e7eb;
+  display:flex; justify-content:space-between; align-items:center;
+}
+.kpi .label{ font-size:13px; opacity:.9; }
+.kpi .value{ font-weight:800; font-size:24px; }
+
+.kpi--work  { background:#f7fff0; border-top:3px solid #84a900; }
+.kpi--lunch { background:#fff7f0; border-top:3px solid #f59e0b; }
+.kpi--off   { background:#fff1f6; border-top:3px solid #d61f69; }
+.kpi--total { background:#f3f4f6; border-top:3px solid #9ca3af; }
+
+#chartEstado{ margin-bottom:6px; }

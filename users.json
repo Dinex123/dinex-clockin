@@ -8,5 +8,45 @@
     "estado": "Activo",
     "fecha_creacion": "2025-08-14T22:08:41.662Z",
     "fecha_baja": null
+  },
+  {
+    "nombre": "Ricardo Rivas",
+    "usuario": "rivas",
+    "contrasena": "rivas123",
+    "departamento": "Contabilidad",
+    "activo": true,
+    "estado": "Activo",
+    "fecha_creacion": "2025-08-15T04:22:34.490Z",
+    "fecha_baja": null
+  },
+  {
+    "nombre": "Juan Garcia",
+    "usuario": "juan",
+    "contrasena": "juan123",
+    "departamento": "Corporativo",
+    "activo": true,
+    "estado": "Activo",
+    "fecha_creacion": "2025-08-16T02:00:46.744Z",
+    "fecha_baja": null
+  },
+  {
+    "nombre": "Alejandro Mejia",
+    "usuario": "ale",
+    "contrasena": "ale123",
+    "departamento": "Cobranza",
+    "activo": true,
+    "estado": "Activo",
+    "fecha_creacion": "2025-08-16T02:01:08.662Z",
+    "fecha_baja": null
+  },
+  {
+    "nombre": "Luis Chirino",
+    "usuario": "luis",
+    "contrasena": "luis123",
+    "departamento": "Departamento de IT",
+    "activo": true,
+    "estado": "Activo",
+    "fecha_creacion": "2025-08-16T03:06:46.451Z",
+    "fecha_baja": null
   }
 ]
