@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Gestión de Supervisores</title>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    .contenedor { max-width: 650px; margin: auto; padding: 28px 20px; }
+    .logo { max-width: 180px; display: block; margin: 0 auto 16px; }
+    h1 { text-align: center; color: #84ae05; margin-bottom: 6px; }
+    .subtitulo { text-align: center; color: #999; font-size: 13px; margin-bottom: 24px; }
+
+    .form-card { background: #f9f9f9; border-radius: 10px; padding: 20px 22px;
+      border: 1px solid #eee; margin-bottom: 28px; }
+    .form-card h2 { font-size: 15px; color: #555; margin-bottom: 16px; }
+    .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .form-grid input { padding: 9px 12px; border: 1px solid #ccc; border-radius: 7px;
+      font-size: 14px; width: 100%; }
+    .form-grid input:focus { border-color: #84ae05; outline: none; }
+    .form-full { grid-column: 1 / -1; }
+    .boton { background: #84ae05; color: #fff; border: none; padding: 10px 20px;
+      border-radius: 7px; font-size: 14px; cursor: pointer; }
+    .boton:hover { background: #6a8e04; }
+    .boton.danger { background: #ec008c; }
+    .boton.danger:hover { background: #c60074; }
+    #msg { font-size: 13px; font-weight: 600; margin-top: 8px; min-height: 18px; }
+
+    table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    th { background: #f0f0f0; padding: 9px 12px; text-align: left;
+      border-bottom: 2px solid #ddd; color: #555; font-size: 13px; }
+    td { padding: 10px 12px; border-bottom: 1px solid #eee; }
+    .url-box { background: #1a1a2e; color: #a8ff60; border-radius: 8px;
+      padding: 12px 16px; font-family: monospace; font-size: 13px;
+      margin-bottom: 20px; word-break: break-all; }
+    .url-label { font-size: 12px; color: #888; margin-bottom: 6px; font-weight: 600; }
+    .volver { display: block; text-align: center; margin-top: 24px; }
+    a.boton { display: inline-block; text-decoration: none; background: #ec008c; }
+  </style>
+</head>
+<body>
+  <script>
+    (function() {
+      if (!sessionStorage.getItem('adminUser')) window.location.replace('admin-login.html');
+    })();
+  </script>
+
+  <div class="contenedor">
+    <img src="logo-dinex.png" alt="DinEX" class="logo">
+    <h1>Gestión de Supervisores</h1>
+    <p class="subtitulo">Los supervisores pueden ver el monitor en tiempo real desde cualquier celular.</p>
+
+    <div class="url-label">URL del monitor para supervisores:</div>
+    <div class="url-box" id="urlBox">Cargando...</div>
+
+    <div class="form-card">
+      <h2>Crear o actualizar supervisor</h2>
+      <div class="form-grid">
+        <div>
+          <input type="text" id="nombre" placeholder="Nombre completo">
+        </div>
+        <div>
+          <input type="text" id="username" placeholder="Usuario (sin espacios)">
+        </div>
+        <div class="form-full">
+          <input type="password" id="password" placeholder="Contraseña (mínimo 6 caracteres)">
+        </div>
+        <div class="form-full">
+          <button class="boton" onclick="crearSupervisor()">Guardar Supervisor</button>
+          <div id="msg"></div>
+        </div>
+      </div>
+    </div>
+
+    <h2 style="font-size:15px;color:#555;margin-bottom:12px;">Supervisores registrados</h2>
+    <table>
+      <thead><tr><th>Nombre</th><th>Usuario</th><th>Acciones</th></tr></thead>
+      <tbody id="tablaSupervisores">
+        <tr><td colspan="3" style="color:#bbb;text-align:center;">Cargando...</td></tr>
+      </tbody>
+    </table>
+
+    <div class="volver">
+      <a href="admin.html" class="boton">← Volver al Panel</a>
+    </div>
+  </div>
+
+  <script>
+    // Mostrar URL dinámica
+    document.getElementById('urlBox').textContent =
+      window.location.origin + '/supervisor-login.html';
+
+    function adminHeaders() {
+      return {
+        'Content-Type': 'application/json',
+        'x-admin-auth': JSON.stringify({
+          username: sessionStorage.getItem('adminUser') || '',
+          password: sessionStorage.getItem('adminPass') || ''
+        })
+      };
+    }
+
+    async function cargarSupervisores() {
+      try {
+        const res = await fetch('/api/supervisores', { headers: adminHeaders() });
+        const data = await res.json();
+        const tbody = document.getElementById('tablaSupervisores');
+        if (!data.length) {
+          tbody.innerHTML = '<tr><td colspan="3" style="color:#bbb;text-align:center;">No hay supervisores registrados</td></tr>';
+          return;
+        }
+        tbody.innerHTML = data.map(s => `
+          <tr>
+            <td>${s.nombre}</td>
+            <td>${s.username}</td>
+            <td><button class="boton danger" onclick="eliminarSupervisor('${s.username}')">Eliminar</button></td>
+          </tr>`).join('');
+      } catch(e) { console.error(e); }
+    }
+
+    async function crearSupervisor() {
+      const nombre   = document.getElementById('nombre').value.trim();
+      const username = document.getElementById('username').value.trim();
+      const password = document.getElementById('password').value;
+      const msg      = document.getElementById('msg');
+
+      if (!nombre || !username || !password) {
+        msg.style.color = 'red'; msg.textContent = 'Completa todos los campos.'; return;
+      }
+      try {
+        const res = await fetch('/api/crear-supervisor', {
+          method: 'POST', headers: adminHeaders(),
+          body: JSON.stringify({ nombre, username, password })
+        });
+        const data = await res.json();
+        msg.style.color = data.success ? 'green' : 'red';
+        msg.textContent = data.mensaje || (data.success ? 'Guardado.' : 'Error.');
+        if (data.success) {
+          document.getElementById('nombre').value = '';
+          document.getElementById('username').value = '';
+          document.getElementById('password').value = '';
+          cargarSupervisores();
+        }
+      } catch(e) { msg.style.color='red'; msg.textContent='Error de conexión.'; }
+    }
+
+    async function eliminarSupervisor(username) {
+      if (!confirm(`¿Eliminar al supervisor "${username}"?`)) return;
+      try {
+        const res = await fetch('/api/eliminar-supervisor', {
+          method: 'DELETE', headers: adminHeaders(),
+          body: JSON.stringify({ username })
+        });
+        const data = await res.json();
+        if (data.success) cargarSupervisores();
+      } catch(e) { alert('Error de conexión.'); }
+    }
+
+    cargarSupervisores();
+  </script>
+  <script src="common.js"></script>
+</body>
+</html>

@@ -2,89 +2,169 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>Crear Usuario</title>
+  <title>Crear / Editar Usuario</title>
   <link rel="stylesheet" href="style.css">
   <style>
-    .contenedor {
-      max-width: 400px;
-      margin: auto;
-      padding: 30px 20px;
-    }
-    .logo {
-      max-width: 200px;
-      display: block;
-      margin: 0 auto 20px auto;
-    }
-    h1 {
-      text-align: center;
-      margin-bottom: 30px;
-      color: #85b100;
-    }
-    form {
-      display: flex;
-      flex-direction: column;
-      gap: 15px;
-    }
+    .contenedor { max-width: 420px; margin: auto; padding: 30px 20px; }
+    .logo { max-width: 200px; display: block; margin: 0 auto 20px auto; }
+    h1 { text-align: center; margin-bottom: 6px; color: #85b100; }
+    .subtitulo { text-align: center; color: #999; font-size: 13px; margin-bottom: 24px; }
+    form { display: flex; flex-direction: column; gap: 14px; }
     input, select {
-      padding: 8px;
-      border: 1px solid #ccc;
-      border-radius: 5px;
-      font-size: 14px;
+      padding: 9px 12px; border: 1px solid #ccc;
+      border-radius: 6px; font-size: 14px; width: 100%; box-sizing: border-box;
     }
+    input:focus, select:focus { border-color: #ec008c; outline: none; }
+    input[readonly] { background: #f5f5f5; color: #888; cursor: not-allowed; }
+
+    /* Campo contraseña con ojo */
+    .pass-wrap { position: relative; }
+    .pass-wrap input { padding-right: 42px; }
+    .btn-ojo {
+      position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
+      background: none; border: none; cursor: pointer; font-size: 18px;
+      color: #aaa; padding: 0; line-height: 1;
+    }
+    .btn-ojo:hover { color: #ec008c; }
+
     .boton {
-      background-color: #ec008c;
-      color: white;
-      border: none;
-      padding: 10px;
-      border-radius: 5px;
-      cursor: pointer;
-      text-align: center;
+      background-color: #ec008c; color: white; border: none;
+      padding: 11px; border-radius: 6px; cursor: pointer;
+      text-align: center; font-size: 15px; font-weight: 600;
     }
-    .boton:hover {
-      background-color: #c60074;
-    }
-    #mensaje {
-      text-align: center;
-      font-weight: bold;
-      margin-top: 5px;
-    }
+    .boton:hover { background-color: #c60074; }
+    .boton.verde { background-color: #85b100; }
+    .boton.verde:hover { background-color: #6a8e04; }
+    #mensaje { text-align: center; font-weight: bold; margin-top: 4px; min-height: 20px; }
+
+    /* Tabs */
+    .tabs { display: flex; gap: 0; margin-bottom: 20px; border-radius: 8px; overflow: hidden; border: 1px solid #ddd; }
+    .tab { flex: 1; padding: 10px; text-align: center; cursor: pointer; font-size: 14px;
+      font-weight: 600; background: #f5f5f5; color: #888; border: none; }
+    .tab.activo { background: #ec008c; color: #fff; }
+    .tab:hover:not(.activo) { background: #ffe0f3; }
+
+    /* Lista usuarios para editar */
+    .user-search { padding: 8px 12px; border: 1px solid #ccc; border-radius: 6px;
+      font-size: 14px; width: 100%; box-sizing: border-box; margin-bottom: 8px; }
+    .user-list { max-height: 200px; overflow-y: auto; border: 1px solid #eee; border-radius: 6px; }
+    .user-item { padding: 10px 14px; cursor: pointer; font-size: 13px; border-bottom: 1px solid #f5f5f5;
+      display: flex; justify-content: space-between; align-items: center; }
+    .user-item:hover { background: #fce8f3; }
+    .user-item .dept { font-size: 11px; color: #aaa; }
+    .seccion { display: none; }
+    .seccion.visible { display: block; }
   </style>
 </head>
 <body>
+  <script>
+    (function() {
+      if (!sessionStorage.getItem('adminUser')) window.location.replace('admin-login.html');
+    })();
+  </script>
+
   <div class="contenedor">
     <img src="logo-dinex.png" alt="Logo DinEX" class="logo">
-    <h1>Crear Nuevo Usuario</h1>
+    <h1>Gestión de Usuarios</h1>
+    <p class="subtitulo">Crea nuevos empleados o edita los existentes</p>
 
-    <form id="crearForm">
-      <input type="text" id="nombre" placeholder="Nombre completo" required>
-      <input type="text" id="usuario" placeholder="Usuario" required>
-      <input type="password" id="contrasena" placeholder="Contraseña" required>
+    <div class="tabs">
+      <button class="tab activo" onclick="cambiarTab('crear')">➕ Crear Usuario</button>
+      <button class="tab" onclick="cambiarTab('editar')">✏️ Editar Usuario</button>
+    </div>
 
-      <select id="departamento" required>
-        <option value="" disabled selected>Selecciona un departamento</option>
-        <option value="Corporativo">Corporativo</option>
-        <option value="Contabilidad">Contabilidad</option>
-        <option value="Cobranza">Cobranza</option>
-        <option value="Cumplimiento Legal">Cumplimiento Legal</option>
-        <option value="Sucursales">Sucursales</option>
-        <option value="Departamento de IT">Departamento de IT</option>
-      </select>
+    <!-- TAB CREAR -->
+    <div id="secCrear" class="seccion visible">
+      <form id="crearForm">
+        <input type="text" id="nombre" placeholder="Nombre completo" required>
+        <input type="text" id="usuario" placeholder="Usuario (sin espacios)" required>
 
-      <button type="submit" class="boton">Crear Usuario</button>
-      <p id="mensaje"></p>
-    </form>
+        <div class="pass-wrap">
+          <input type="password" id="contrasena" placeholder="Contraseña" required>
+          <button type="button" class="btn-ojo" onclick="toggleOjo('contrasena',this)" title="Ver contraseña">👁</button>
+        </div>
+
+        <select id="departamento" required>
+          <option value="" disabled selected>Selecciona un departamento</option>
+          <option value="Corporativo">Corporativo</option>
+          <option value="Contabilidad">Contabilidad</option>
+          <option value="Cobranza">Cobranza</option>
+          <option value="Cumplimiento Legal">Cumplimiento Legal</option>
+          <option value="Sucursales">Sucursales</option>
+          <option value="Departamento de IT">Departamento de IT</option>
+        </select>
+
+        <button type="submit" class="boton">Crear Usuario</button>
+        <p id="mensaje"></p>
+      </form>
+    </div>
+
+    <!-- TAB EDITAR -->
+    <div id="secEditar" class="seccion">
+      <p style="font-size:13px;color:#666;margin-bottom:10px;">Busca y selecciona el empleado que quieres editar:</p>
+      <input type="text" class="user-search" id="buscarEditar" placeholder="Buscar por nombre o usuario..." oninput="filtrarUsuarios()">
+      <div class="user-list" id="listaUsuarios"></div>
+
+      <div id="formEditar" style="display:none; margin-top:16px;">
+        <form id="editarForm">
+          <input type="text" id="editNombre" placeholder="Nombre completo" required>
+          <input type="text" id="editUsuario" readonly style="background:#f5f5f5; color:#888;">
+
+          <div class="pass-wrap">
+            <input type="password" id="editContrasena" placeholder="Nueva contraseña (dejar vacío para no cambiar)">
+            <button type="button" class="btn-ojo" onclick="toggleOjo('editContrasena',this)" title="Ver contraseña">👁</button>
+          </div>
+
+          <select id="editDepartamento" required>
+            <option value="" disabled>Selecciona un departamento</option>
+            <option value="Corporativo">Corporativo</option>
+            <option value="Contabilidad">Contabilidad</option>
+            <option value="Cobranza">Cobranza</option>
+            <option value="Cumplimiento Legal">Cumplimiento Legal</option>
+            <option value="Sucursales">Sucursales</option>
+            <option value="Departamento de IT">Departamento de IT</option>
+          </select>
+
+          <button type="submit" class="boton verde">Guardar Cambios</button>
+          <p id="mensajeEditar"></p>
+        </form>
+      </div>
+    </div>
 
     <br>
-    <a href="admin.html" class="boton">Volver al Panel</a>
+    <a href="admin.html" class="boton">← Volver al Panel</a>
   </div>
 
   <script>
+    let todosUsuarios = [];
+
+    function cambiarTab(tab) {
+      document.getElementById('secCrear').classList.toggle('visible', tab === 'crear');
+      document.getElementById('secEditar').classList.toggle('visible', tab === 'editar');
+      document.querySelectorAll('.tab').forEach((t, i) => {
+        t.classList.toggle('activo', (i === 0 && tab === 'crear') || (i === 1 && tab === 'editar'));
+      });
+      if (tab === 'editar') cargarUsuariosEditar();
+    }
+
+    // ── Mostrar/ocultar contraseña ─────────────────────────────
+    function toggleOjo(inputId, btn) {
+      const input = document.getElementById(inputId);
+      if (input.type === 'password') {
+        input.type = 'text';
+        btn.textContent = '🙈';
+      } else {
+        input.type = 'password';
+        btn.textContent = '👁';
+      }
+    }
+
+    // ── Crear usuario ──────────────────────────────────────────
     document.getElementById('crearForm').addEventListener('submit', async function(e) {
       e.preventDefault();
-
       const nombre       = document.getElementById('nombre').value.trim();
       const usuario      = document.getElementById('usuario').value.trim();
-      const contrasena   = document.getElementById('contrasena').value.trim();
+      const contrasena   = document.getElementById('contrasena').value;
       const departamento = document.getElementById('departamento').value;
       const mensajeEl    = document.getElementById('mensaje');
 
@@ -93,32 +173,102 @@
         mensajeEl.textContent = 'Por favor completa todos los campos.';
         return;
       }
-
-      // ➕ Generar fecha de creación
-      const fecha_creacion = new Date().toISOString();
-
       try {
-        const response = await fetch('/api/crear-usuario', {
+        const res = await fetch('/api/crear-usuario', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ nombre, usuario, contrasena, departamento, fecha_creacion })
+          body: JSON.stringify({ nombre, usuario, contrasena, departamento, fecha_creacion: new Date().toISOString() })
         });
-
-        const result = await response.json();
-        if (result.success) {
-          mensajeEl.style.color = 'green';
-          mensajeEl.textContent = 'Usuario creado exitosamente';
-          this.reset();
-        } else {
-          mensajeEl.style.color = 'red';
-          mensajeEl.textContent = result.mensaje || 'El usuario ya está registrado';
-        }
+        const result = await res.json();
+        mensajeEl.style.color = result.success ? 'green' : 'red';
+        mensajeEl.textContent = result.success ? '✅ Usuario creado exitosamente' : (result.mensaje || 'Error al crear usuario');
+        if (result.success) this.reset();
       } catch (err) {
         mensajeEl.style.color = 'red';
         mensajeEl.textContent = 'Error de conexión con el servidor.';
-        console.error('Error al crear usuario:', err);
+      }
+    });
+
+    // ── Cargar usuarios para editar ────────────────────────────
+    async function cargarUsuariosEditar() {
+      try {
+        const res = await fetch('/api/empleados');
+        todosUsuarios = await res.json();
+        renderListaUsuarios(todosUsuarios);
+      } catch(e) { console.error(e); }
+    }
+
+    function renderListaUsuarios(lista) {
+      const cont = document.getElementById('listaUsuarios');
+      if (!lista.length) {
+        cont.innerHTML = '<div style="padding:12px;text-align:center;color:#aaa;font-size:13px;">No hay usuarios</div>';
+        return;
+      }
+      cont.innerHTML = lista.map(u => `
+        <div class="user-item" onclick="seleccionarUsuario('${u.usuario}')">
+          <div>
+            <strong>${u.nombre || u.usuario}</strong><br>
+            <span class="dept">${u.usuario} — ${u.departamento || ''}</span>
+          </div>
+          <span style="color:#ec008c;font-size:18px;">›</span>
+        </div>`).join('');
+    }
+
+    function filtrarUsuarios() {
+      const q = document.getElementById('buscarEditar').value.toLowerCase();
+      renderListaUsuarios(todosUsuarios.filter(u =>
+        u.usuario.toLowerCase().includes(q) || (u.nombre||''). toLowerCase().includes(q)
+      ));
+    }
+
+    function seleccionarUsuario(username) {
+      const u = todosUsuarios.find(x => x.usuario === username);
+      if (!u) return;
+      document.getElementById('editNombre').value       = u.nombre || '';
+      document.getElementById('editUsuario').value      = u.usuario;
+      document.getElementById('editContrasena').value   = '';
+      document.getElementById('editDepartamento').value = u.departamento || '';
+      document.getElementById('formEditar').style.display = 'block';
+      document.getElementById('mensajeEditar').textContent = '';
+      document.getElementById('formEditar').scrollIntoView({ behavior: 'smooth' });
+    }
+
+    // ── Guardar edición ────────────────────────────────────────
+    document.getElementById('editarForm').addEventListener('submit', async function(e) {
+      e.preventDefault();
+      const usuario      = document.getElementById('editUsuario').value;
+      const nombre       = document.getElementById('editNombre').value.trim();
+      const contrasena   = document.getElementById('editContrasena').value;
+      const departamento = document.getElementById('editDepartamento').value;
+      const msgEl        = document.getElementById('mensajeEditar');
+
+      if (!nombre || !departamento) {
+        msgEl.style.color = 'red';
+        msgEl.textContent = 'Nombre y departamento son requeridos.';
+        return;
+      }
+      try {
+        const res = await fetch('/api/editar-usuario', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-admin-auth': JSON.stringify({
+              username: sessionStorage.getItem('adminUser') || '',
+              password: sessionStorage.getItem('adminPass') || ''
+            })
+          },
+          body: JSON.stringify({ usuario, nombre, departamento, contrasena: contrasena || null })
+        });
+        const result = await res.json();
+        msgEl.style.color = result.success ? 'green' : 'red';
+        msgEl.textContent = result.success ? '✅ Usuario actualizado correctamente' : (result.mensaje || 'Error al actualizar');
+        if (result.success) cargarUsuariosEditar();
+      } catch(err) {
+        msgEl.style.color = 'red';
+        msgEl.textContent = 'Error de conexión.';
       }
     });
   </script>
+  <script src="common.js"></script>
 </body>
 </html>

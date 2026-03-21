@@ -50,6 +50,8 @@
 
         if (data && data.success) {
           sessionStorage.setItem("admin", usuario);
+          sessionStorage.setItem("adminUser", usuario);
+          sessionStorage.setItem("adminPass", clave);
           window.location.href = 'admin.html';
         } else {
           msg.style.color = "red";

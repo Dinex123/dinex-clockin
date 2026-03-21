@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <title>DinEX — Monitor Supervisor</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: Arial, sans-serif; background: #f0f2f5; min-height: 100vh; }
+
+    /* Header */
+    .header {
+      background: #fff; padding: 12px 16px;
+      display: flex; align-items: center; justify-content: space-between;
+      border-bottom: 3px solid #84ae05; position: sticky; top: 0; z-index: 100;
+      box-shadow: 0 2px 8px rgba(0,0,0,.06);
+    }
+    .header-left { display: flex; align-items: center; gap: 10px; }
+    .header img { height: 36px; }
+    .header-title { font-size: 15px; font-weight: 700; color: #84ae05; }
+    .header-sub { font-size: 11px; color: #999; }
+    .btn-salir { background: #f0f0f0; color: #666; border: none; padding: 7px 14px;
+      border-radius: 20px; font-size: 12px; cursor: pointer; }
+    .btn-salir:hover { background: #e0e0e0; }
+
+    /* Barra inactividad supervisor */
+    #sup-inactivity-wrap {
+      background: rgba(255,255,255,0.3); height: 5px; overflow: hidden;
+    }
+    #sup-inactivity-bar {
+      height: 100%; width: 100%; background: #84ae05;
+    }
+    #sup-inactivity-label {
+      background: #84ae05; color: #fff; text-align: center;
+      font-size: 10px; padding: 2px 0; letter-spacing: 0.5px;
+    }
+
+    /* Hora en vivo */
+    .live-bar { background: #84ae05; color: #fff; text-align: center;
+      padding: 6px; font-size: 13px; font-weight: 600; letter-spacing: 1px; }
+
+    /* KPIs */
+    .kpis { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; padding: 14px 12px 0; }
+    .kpi { background: #fff; border-radius: 12px; padding: 14px 12px;
+      text-align: center; box-shadow: 0 2px 8px rgba(0,0,0,.05); }
+    .kpi-valor { font-size: 40px; font-weight: 800; line-height: 1; }
+    .kpi-label { font-size: 12px; color: #888; margin-top: 4px; }
+    .kpi.trabajo  { border-top: 4px solid #84ae05; }
+    .kpi.lunch    { border-top: 4px solid #f59e0b; }
+    .kpi.fuera    { border-top: 4px solid #ec008c; }
+    .kpi.total    { border-top: 4px solid #9ca3af; }
+    .kpi.trabajo  .kpi-valor { color: #4a7c00; }
+    .kpi.lunch    .kpi-valor { color: #b45309; }
+    .kpi.fuera    .kpi-valor { color: #be0070; }
+    .kpi.total    .kpi-valor { color: #555; }
+
+    /* Gráfica */
+    .chart-wrap { background: #fff; border-radius: 12px; margin: 10px 12px;
+      padding: 14px; box-shadow: 0 2px 8px rgba(0,0,0,.05); }
+    .chart-title { font-size: 13px; font-weight: 700; color: #84ae05; margin-bottom: 10px; text-align: center; }
+
+    /* Listas de empleados */
+    .listas { padding: 0 12px 20px; }
+    .lista-card { background: #fff; border-radius: 12px; margin-bottom: 10px;
+      overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,.05); }
+    .lista-header { padding: 10px 14px; font-size: 13px; font-weight: 700;
+      display: flex; align-items: center; gap: 8px; }
+    .lista-header.trabajo { background: #f0fce8; color: #4a7c00; border-left: 4px solid #84ae05; }
+    .lista-header.lunch   { background: #fffbeb; color: #b45309; border-left: 4px solid #f59e0b; }
+    .lista-header.fuera   { background: #fce8f3; color: #be0070; border-left: 4px solid #ec008c; }
+    .lista-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+    .dot-verde { background: #84ae05; }
+    .dot-amber { background: #f59e0b; }
+    .dot-rosa  { background: #ec008c; }
+    .lista-body { padding: 6px 0; }
+    .empleado-item { padding: 8px 14px; font-size: 13px; color: #444;
+      border-bottom: 1px solid #f5f5f5; display: flex; align-items: center; gap: 8px; }
+    .empleado-item:last-child { border-bottom: none; }
+    .emp-avatar { width: 28px; height: 28px; border-radius: 50%; background: #f0f0f0;
+      display: flex; align-items: center; justify-content: center; font-size: 12px;
+      font-weight: 700; color: #666; flex-shrink: 0; }
+    .lista-vacia { padding: 12px 14px; font-size: 12px; color: #bbb; font-style: italic; }
+
+    /* Refresh */
+    .refresh-info { text-align: center; font-size: 11px; color: #bbb; padding: 8px; }
+    .actualizando { color: #84ae05; font-weight: 600; }
+  </style>
+</head>
+<body>
+  <script>
+    (function() {
+      if (!sessionStorage.getItem('supervisorUser')) {
+        window.location.replace('supervisor-login.html');
+      }
+    })();
+  </script>
+
+  <div class="header">
+    <div class="header-left">
+      <img src="logo-dinex.png" alt="DinEX">
+      <div>
+        <div class="header-title">Monitor Supervisor</div>
+        <div class="header-sub" id="supervisorNombre">Cargando...</div>
+      </div>
+    </div>
+    <button class="btn-salir" onclick="cerrarSesionSupervisor()">Salir</button>
+  </div>
+
+  <div class="live-bar" id="horaLive">--:-- --</div>
+
+  <!-- Timer de inactividad -->
+  <div id="sup-inactivity-wrap">
+    <div id="sup-inactivity-bar"></div>
+  </div>
+  <div id="sup-inactivity-label">Sesión activa</div>
+
+  <div class="kpis">
+    <div class="kpi trabajo">
+      <div class="kpi-valor" id="kpiTrabajando">0</div>
+      <div class="kpi-label">Trabajando</div>
+    </div>
+    <div class="kpi lunch">
+      <div class="kpi-valor" id="kpiAlmuerzo">0</div>
+      <div class="kpi-label">En almuerzo</div>
+    </div>
+    <div class="kpi fuera">
+      <div class="kpi-valor" id="kpiNoTrabajando">0</div>
+      <div class="kpi-label">No trabajando</div>
+    </div>
+    <div class="kpi total">
+      <div class="kpi-valor" id="kpiTotal">0</div>
+      <div class="kpi-label">Total activos</div>
+    </div>
+  </div>
+
+  <div class="chart-wrap">
+    <div class="chart-title">Estado del día</div>
+    <canvas id="donaChart" height="180"></canvas>
+  </div>
+
+  <div class="listas">
+    <div class="lista-card">
+      <div class="lista-header trabajo">
+        <div class="lista-dot dot-verde"></div>
+        Trabajando (<span id="cntTrabajando">0</span>)
+      </div>
+      <div class="lista-body" id="listaTrabajando">
+        <div class="lista-vacia">Sin datos aún</div>
+      </div>
+    </div>
+
+    <div class="lista-card">
+      <div class="lista-header lunch">
+        <div class="lista-dot dot-amber"></div>
+        En almuerzo (<span id="cntAlmuerzo">0</span>)
+      </div>
+      <div class="lista-body" id="listaAlmuerzo">
+        <div class="lista-vacia">Sin datos aún</div>
+      </div>
+    </div>
+
+    <div class="lista-card">
+      <div class="lista-header fuera">
+        <div class="lista-dot dot-rosa"></div>
+        No trabajando (<span id="cntNoTrabajando">0</span>)
+      </div>
+      <div class="lista-body" id="listaNoTrabajando">
+        <div class="lista-vacia">Sin datos aún</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="refresh-info" id="refreshInfo">Actualizando cada 30 segundos</div>
+
+  <script>
+    let donaChart = null;
+
+    // Hora en vivo
+    function actualizarHora() {
+      const ahora = new Date();
+      const h = ahora.getHours().toString().padStart(2,'0');
+      const m = ahora.getMinutes().toString().padStart(2,'0');
+      const s = ahora.getSeconds().toString().padStart(2,'0');
+      const ampm = ahora.getHours() >= 12 ? 'PM' : 'AM';
+      const h12 = (ahora.getHours() % 12 || 12).toString().padStart(2,'0');
+      document.getElementById('horaLive').textContent =
+        new Date().toLocaleDateString('es-MX', {weekday:'long', month:'long', day:'numeric'}).toUpperCase() +
+        '   ' + h12 + ':' + m + ':' + s + ' ' + ampm;
+    }
+    setInterval(actualizarHora, 1000);
+    actualizarHora();
+
+    document.getElementById('supervisorNombre').textContent =
+      'Hola, ' + (sessionStorage.getItem('supervisorUser') || 'Supervisor');
+
+    function iniciales(nombre) {
+      return (nombre || '?').split(' ').map(n=>n[0]).join('').toUpperCase().slice(0,2);
+    }
+
+    function renderLista(containerId, countId, nombres) {
+      const cont = document.getElementById(containerId);
+      document.getElementById(countId).textContent = nombres.length;
+      if (!nombres.length) {
+        cont.innerHTML = '<div class="lista-vacia">Ninguno por el momento</div>';
+        return;
+      }
+      cont.innerHTML = nombres.map(n => `
+        <div class="empleado-item">
+          <div class="emp-avatar">${iniciales(n)}</div>
+          ${n}
+        </div>`).join('');
+    }
+
+    async function cargarDatos() {
+      const ref = document.getElementById('refreshInfo');
+      ref.innerHTML = '<span class="actualizando">Actualizando...</span>';
+      try {
+        const res = await fetch('/api/resumen-estado-hoy');
+        const d = await res.json();
+
+        document.getElementById('kpiTrabajando').textContent  = d.trabajando   ?? 0;
+        document.getElementById('kpiAlmuerzo').textContent    = d.enAlmuerzo   ?? 0;
+        document.getElementById('kpiNoTrabajando').textContent = d.noTrabajando ?? 0;
+        document.getElementById('kpiTotal').textContent       = d.totalActivos  ?? 0;
+
+        const listas = d.listas || {};
+        renderLista('listaTrabajando',  'cntTrabajando',   listas.trabajando   || []);
+        renderLista('listaAlmuerzo',    'cntAlmuerzo',     listas.enAlmuerzo   || []);
+        renderLista('listaNoTrabajando','cntNoTrabajando', listas.noTrabajando || []);
+
+        // Dona
+        const datos = [d.trabajando||0, d.enAlmuerzo||0, d.noTrabajando||0];
+        if (!donaChart) {
+          const ctx = document.getElementById('donaChart');
+          donaChart = new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+              labels: ['Trabajando','En almuerzo','No trabajando'],
+              datasets: [{ data: datos,
+                backgroundColor: ['#84ae05','#f59e0b','#ec008c'],
+                borderColor: '#fff', borderWidth: 3 }]
+            },
+            options: { responsive: true, cutout: '62%',
+              plugins: { legend: { position: 'bottom',
+                labels: { usePointStyle: true, font: { size: 13 } } } } }
+          });
+        } else {
+          donaChart.data.datasets[0].data = datos;
+          donaChart.update();
+        }
+
+        const ahora = new Date();
+        ref.textContent = 'Ultima actualización: ' +
+          ahora.toLocaleTimeString('es-MX', {hour:'2-digit', minute:'2-digit', second:'2-digit'}) +
+          ' — Próxima en 30 seg.';
+      } catch(err) {
+        ref.textContent = 'Error al cargar — reintentando...';
+      }
+    }
+
+    function cerrarSesionSupervisor() {
+      sessionStorage.removeItem('supervisorUser');
+      window.location.href = 'supervisor-login.html';
+    }
+
+    // ── Timer de inactividad con barra visual (30 min) ────────────────────
+    const TIMEOUT_SUP = 30 * 60 * 1000;
+    const WARNING_SUP =  3 * 60 * 1000;
+    let timerSup, startSup, rafSup;
+    const barSup   = document.getElementById('sup-inactivity-bar');
+    const labelSup = document.getElementById('sup-inactivity-label');
+
+    function animarBarraSup() {
+      const elapsed = Date.now() - startSup;
+      const pct     = Math.min(elapsed / TIMEOUT_SUP, 1);
+      const restMs  = Math.max(TIMEOUT_SUP - elapsed, 0);
+      const restMin = Math.floor(restMs / 60000);
+      const restSec = Math.floor((restMs % 60000) / 1000);
+      barSup.style.width = (100 - pct * 100).toFixed(1) + '%';
+      if (restMs <= WARNING_SUP) {
+        barSup.style.background = '#ea1902';
+        labelSup.style.color    = '#ea1902';
+        labelSup.textContent    = `⚠️ Sesión cierra en ${restMin}:${String(restSec).padStart(2,'0')} min`;
+      } else {
+        barSup.style.background = '#84ae05';
+        labelSup.style.color    = '#fff';
+        labelSup.textContent    = `Sesión activa — cierra en ${restMin}:${String(restSec).padStart(2,'0')} min`;
+      }
+      if (pct < 1) rafSup = requestAnimationFrame(animarBarraSup);
+    }
+
+    function reiniciarTimerSup() {
+      clearTimeout(timerSup);
+      cancelAnimationFrame(rafSup);
+      startSup = Date.now();
+      animarBarraSup();
+      timerSup = setTimeout(() => {
+        alert('Sesión cerrada por inactividad.');
+        sessionStorage.removeItem('supervisorUser');
+        window.location.href = 'supervisor-login.html';
+      }, TIMEOUT_SUP);
+    }
+    ['click','mousemove','keypress','scroll','touchstart'].forEach(e =>
+      document.addEventListener(e, reiniciarTimerSup)
+    );
+    reiniciarTimerSup();
+
+    cargarDatos();
+    setInterval(cargarDatos, 30000);
+  </script>
+</body>
+</html>

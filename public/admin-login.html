@@ -16,6 +16,10 @@
       <button type="submit" id="btnLogin" class="boton">Iniciar Sesión</button>
       <p id="error" style="color:red; margin-top:10px;"></p>
     </form>
+
+    <p style="margin-top:28px; font-size:12px; color:#bbb; text-align:center; letter-spacing:0.5px;">
+      DinEX WebClock &nbsp;·&nbsp; v1.2.0
+    </p>
   </div>
 
   <!-- Utilidades compartidas (postJSON, mostrarMensaje, cerrarSesion) -->
@@ -48,6 +52,9 @@
         const result = await postJSON('/api/admin-login', { username, password });
 
         if (result && result.success) {
+          // Guardar credenciales para que las páginas protegidas puedan usarlas
+          sessionStorage.setItem('adminUser', username);
+          sessionStorage.setItem('adminPass', password);
           window.location.href = 'admin.html';
         } else {
           err.textContent = 'Credenciales incorrectas';

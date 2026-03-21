@@ -29,6 +29,15 @@
   </style>
 </head>
 <body>
+  <script>
+    // Guard de sesión admin - redirige si no hay credenciales
+    (function() {
+      if (!sessionStorage.getItem('adminUser')) {
+        window.location.replace('admin-login.html');
+      }
+    })();
+  </script>
+
   <div class="contenedor">
     <img src="logo-dinex.png" alt="Logo DinEX" class="logo">
     <h1>Empleados Registrados</h1>
@@ -49,6 +58,12 @@
     function safeIdFromUser(user) {
       // ID seguro para inputs por si el usuario tiene espacios/símbolos
       return encodeURIComponent(user);
+    }
+
+    function toggleOjo(inputId, btn) {
+      const input = document.getElementById(inputId);
+      if (input.type === 'password') { input.type = 'text'; btn.textContent = '🙈'; }
+      else { input.type = 'password'; btn.textContent = '👁'; }
     }
 
     async function cargarEmpleados() {
@@ -84,7 +99,10 @@
               <td>${u.departamento || ''}</td>
               <td>${u.activo === false ? 'No' : 'Sí'}</td>
               <td>
-                <input type="password" class="input-clave" id="clave-${sid}" placeholder="Nueva clave">
+                <span style="position:relative;display:inline-block;">
+                  <input type="password" class="input-clave" id="clave-${sid}" placeholder="Nueva clave" style="padding-right:32px;">
+                  <button type="button" onclick="toggleOjo('clave-${sid}',this)" style="position:absolute;right:6px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;font-size:15px;color:#aaa;padding:0;">👁</button>
+                </span>
                 <button class="boton" id="btn-${sid}" onclick="resetear('${encodeURIComponent(u.usuario)}')">Guardar</button>
                 <span id="mensaje-${sid}" class="mensaje"></span>
               </td>
@@ -101,6 +119,15 @@
       } finally {
         btnCargar.disabled = false;
       }
+    }
+
+    function adminHeaders() {
+      const username = sessionStorage.getItem('adminUser') || '';
+      const password = sessionStorage.getItem('adminPass') || '';
+      return {
+        'Content-Type': 'application/json',
+        'x-admin-auth': JSON.stringify({ username, password })
+      };
     }
 
     async function resetear(usuarioEnc) {
@@ -124,7 +151,7 @@
 
         const res = await fetch('/api/reset-password-admin', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: adminHeaders(),
           body: JSON.stringify({ usuario, nuevaClave })
         });
 
@@ -146,5 +173,6 @@
       }
     }
   </script>
+  <script src="common.js"></script>
 </body>
 </html>

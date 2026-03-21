@@ -2,109 +2,230 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>Eliminar Usuario</title>
+  <title>Gestión de Usuarios</title>
   <link rel="stylesheet" href="style.css">
   <style>
-    .contenedor {
-      max-width: 400px;
-      margin: auto;
-      padding: 30px 20px;
+    .contenedor { max-width: 700px; margin: auto; padding: 30px 20px; }
+    .logo { max-width: 200px; display: block; margin: 0 auto 20px auto; }
+    h1 { text-align: center; margin-bottom: 6px; color: #85b100; }
+    .subtitulo { text-align: center; color: #888; margin-bottom: 25px; font-size: 13px; }
+
+    #buscador {
+      width: 100%; padding: 10px 14px; border: 1px solid #ccc;
+      border-radius: 8px; font-size: 15px; margin-bottom: 20px; box-sizing: border-box;
     }
-    .logo {
-      max-width: 200px;
-      display: block;
-      margin: 0 auto 20px auto;
+
+    .tabla-usuarios { width: 100%; border-collapse: collapse; font-size: 14px; }
+    .tabla-usuarios thead th {
+      background-color: #f0f0f0; padding: 10px 12px; text-align: left;
+      border-bottom: 2px solid #ddd; color: #444;
     }
-    h1 {
-      text-align: center;
-      margin-bottom: 30px;
-      color: #85b100;
+    .tabla-usuarios tbody tr { border-bottom: 1px solid #eee; transition: background 0.15s; }
+    .tabla-usuarios tbody tr:hover { background-color: #fafafa; }
+    .tabla-usuarios td { padding: 10px 12px; vertical-align: middle; }
+
+    .badge { display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: 12px; font-weight: bold; }
+    .badge-activo    { background: #e6f4d0; color: #4a7c00; }
+    .badge-inactivo  { background: #fde8f0; color: #b4006d; }
+    .badge-eliminado { background: #f0f0f0; color: #888; }
+
+    .acciones { display: flex; gap: 6px; flex-wrap: wrap; }
+    .btn-accion {
+      padding: 5px 12px; border: none; border-radius: 5px;
+      font-size: 12px; cursor: pointer; font-weight: bold; transition: opacity 0.2s;
     }
-    form {
-      display: flex;
-      flex-direction: column;
-      gap: 15px;
-    }
-    input {
-      padding: 8px;
-      border: 1px solid #ccc;
-      border-radius: 5px;
-      font-size: 14px;
-    }
-    .boton {
-      background-color: #ec008c;
-      color: white;
-      border: none;
-      padding: 10px;
-      border-radius: 5px;
-      cursor: pointer;
-      text-align: center;
-    }
-    .boton:hover {
-      background-color: #c60074;
-    }
-    #mensaje {
-      text-align: center;
-      font-weight: bold;
-      margin-top: 5px;
+    .btn-accion:hover { opacity: 0.8; }
+    .btn-activar    { background: #85b100; color: #fff; }
+    .btn-desactivar { background: #f0a500; color: #fff; }
+    .btn-eliminar   { background: #ec008c; color: #fff; }
+    .btn-accion:disabled { opacity: 0.35; cursor: not-allowed; }
+
+    #mensaje { text-align: center; font-weight: bold; margin: 15px 0; min-height: 22px; font-size: 14px; }
+    #cargando { text-align: center; color: #888; padding: 30px 0; }
+    #sinResultados { display: none; text-align: center; color: #aaa; padding: 20px 0; }
+    .volver-btn { display: block; text-align: center; margin-top: 25px; }
+
+    .nota-auditoria {
+      background: #f7fff0; border-left: 4px solid #85b100;
+      padding: 10px 14px; border-radius: 6px; font-size: 13px;
+      color: #4a7c00; margin-bottom: 20px; text-align: left;
     }
   </style>
 </head>
 <body>
+  <script>
+    // Guard de sesión admin - redirige si no hay credenciales
+    (function() {
+      if (!sessionStorage.getItem('adminUser')) {
+        window.location.replace('admin-login.html');
+      }
+    })();
+  </script>
+
   <div class="contenedor">
     <img src="logo-dinex.png" alt="Logo DinEX" class="logo">
-    <h1>Eliminar Usuario</h1>
+    <h1>Gestión de Usuarios</h1>
+    <p class="subtitulo">Activa, desactiva o elimina empleados del sistema.</p>
 
-    <form id="eliminarForm">
-      <input type="text" id="usuario" placeholder="Usuario a eliminar" required>
-      <button type="submit" class="boton">Eliminar</button>
-      <p id="mensaje"></p>
-    </form>
+    <div class="nota-auditoria">
+      📋 <strong>Auditoría:</strong> Al eliminar un usuario, sus registros de entrada/salida se conservan permanentemente para consultas y reportes históricos.
+    </div>
 
-    <br>
-    <a href="admin.html" class="boton">Volver al Panel</a>
+    <input type="text" id="buscador" placeholder="🔍 Buscar por usuario o nombre..." oninput="filtrarTabla()">
+
+    <div id="mensaje"></div>
+    <div id="cargando">Cargando usuarios...</div>
+
+    <table class="tabla-usuarios" id="tablaUsuarios" style="display:none;">
+      <thead>
+        <tr>
+          <th>Usuario</th>
+          <th>Nombre</th>
+          <th>Estado</th>
+          <th>Acciones</th>
+        </tr>
+      </thead>
+      <tbody id="cuerpoTabla"></tbody>
+    </table>
+    <div id="sinResultados">No se encontraron usuarios.</div>
+
+    <div class="volver-btn">
+      <a href="admin.html" class="boton">← Volver al Panel</a>
+    </div>
   </div>
 
   <script>
-    document.getElementById('eliminarForm').addEventListener('submit', async function(e) {
-      e.preventDefault();
+    let todosLosUsuarios = [];
 
-      const usuario = document.getElementById('usuario').value.trim();
-      const mensaje = document.getElementById('mensaje');
+    async function cargarUsuarios() {
+      try {
+        const res = await fetch('/api/usuarios-detalle');
+        if (!res.ok) throw new Error('Error de servidor');
+        todosLosUsuarios = await res.json();
+        renderTabla(todosLosUsuarios);
+      } catch (e) {
+        document.getElementById('cargando').textContent = 'Error al cargar los usuarios. Verifica la conexión.';
+        console.error(e);
+      }
+    }
 
-      if (!usuario) {
-        mensaje.style.color = 'red';
-        mensaje.textContent = 'Por favor ingresa el usuario.';
+    function renderTabla(usuarios) {
+      const cuerpo   = document.getElementById('cuerpoTabla');
+      const tabla    = document.getElementById('tablaUsuarios');
+      const cargando = document.getElementById('cargando');
+      const sinRes   = document.getElementById('sinResultados');
+      cargando.style.display = 'none';
+
+      if (usuarios.length === 0) {
+        tabla.style.display = 'none';
+        sinRes.style.display = 'block';
         return;
       }
 
-      if (!confirm(`¿Seguro que deseas eliminar el usuario "${usuario}"?`)) {
-        return;
-      }
+      sinRes.style.display = 'none';
+      tabla.style.display = 'table';
+
+      cuerpo.innerHTML = usuarios.map(u => {
+        const eliminado  = u.estado === 'Eliminado';
+        const activo     = u.activo !== false && !eliminado;
+        const badgeClass = eliminado ? 'badge-eliminado' : (activo ? 'badge-activo' : 'badge-inactivo');
+        const badgeText  = eliminado ? 'Eliminado' : (activo ? 'Activo' : 'Inactivo');
+
+        return `
+          <tr id="fila-${u.usuario}">
+            <td><strong>${u.usuario}</strong></td>
+            <td>${u.nombre || '-'}</td>
+            <td><span class="badge ${badgeClass}">${badgeText}</span></td>
+            <td>
+              <div class="acciones">
+                <button class="btn-accion btn-activar"
+                  ${activo || eliminado ? 'disabled' : ''}
+                  onclick="accion('activar','${u.usuario}')">✅ Activar</button>
+                <button class="btn-accion btn-desactivar"
+                  ${!activo || eliminado ? 'disabled' : ''}
+                  onclick="accion('desactivar','${u.usuario}')">⏸ Desactivar</button>
+                <button class="btn-accion btn-eliminar"
+                  ${eliminado ? 'disabled' : ''}
+                  onclick="accion('eliminar','${u.usuario}')">🗑 Eliminar</button>
+              </div>
+            </td>
+          </tr>`;
+      }).join('');
+    }
+
+    function filtrarTabla() {
+      const q = document.getElementById('buscador').value.toLowerCase();
+      renderTabla(todosLosUsuarios.filter(u =>
+        u.usuario.toLowerCase().includes(q) || (u.nombre || '').toLowerCase().includes(q)
+      ));
+    }
+
+    function adminHeaders() {
+      const username = sessionStorage.getItem('adminUser') || '';
+      const password = sessionStorage.getItem('adminPass') || '';
+      return {
+        'Content-Type': 'application/json',
+        'x-admin-auth': JSON.stringify({ username, password })
+      };
+    }
+
+    async function accion(tipo, usuario) {
+      const confirmMsgs = {
+        activar:    `¿Activar al usuario "${usuario}"?`,
+        desactivar: `¿Desactivar al usuario "${usuario}"?`,
+        eliminar:   `¿Eliminar a "${usuario}"?\n\nSus registros de entrada/salida se conservarán para auditoría.`
+      };
+      const endpoints = {
+        activar:    '/api/activar-usuario',
+        desactivar: '/api/desactivar-usuario',
+        eliminar:   '/api/eliminar-usuario'
+      };
+
+      if (!confirm(confirmMsgs[tipo])) return;
+
+      // Deshabilitar botones mientras se procesa
+      document.querySelectorAll(`#fila-${usuario} button`).forEach(b => b.disabled = true);
 
       try {
-        const response = await fetch('/api/eliminar-usuario', {
+        const res = await fetch(endpoints[tipo], {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: adminHeaders(),
           body: JSON.stringify({ usuario })
         });
-
-        const result = await response.json();
+        const result = await res.json();
+        const msg = document.getElementById('mensaje');
 
         if (result.success) {
-          mensaje.style.color = 'green';
-          mensaje.textContent = 'Usuario marcado como eliminado (inactivo)';
-          this.reset();
+          msg.style.color = 'green';
+          const textos = {
+            activar:    `✅ "${usuario}" activado correctamente.`,
+            desactivar: `⏸ "${usuario}" desactivado.`,
+            eliminar:   `🗑 "${usuario}" eliminado. Sus registros se conservan para auditoría.`
+          };
+          msg.textContent = textos[tipo];
+
+          // Actualizar datos en memoria y re-renderizar
+          const u = todosLosUsuarios.find(x => x.usuario === usuario);
+          if (u) {
+            if (tipo === 'activar')    { u.activo = true;  u.estado = ''; }
+            if (tipo === 'desactivar') { u.activo = false; u.estado = ''; }
+            if (tipo === 'eliminar')   { u.activo = false; u.estado = 'Eliminado'; }
+          }
+          filtrarTabla();
         } else {
-          mensaje.style.color = 'red';
-          mensaje.textContent = result.mensaje || 'No se encontró el usuario';
+          msg.style.color = 'red';
+          msg.textContent = result.mensaje || 'No se pudo completar la acción.';
+          cargarUsuarios();
         }
-      } catch (error) {
-        console.error('Error en la solicitud:', error);
-        mensaje.style.color = 'red';
-        mensaje.textContent = 'Error de conexión con el servidor.';
+      } catch (e) {
+        document.getElementById('mensaje').style.color = 'red';
+        document.getElementById('mensaje').textContent = 'Error de conexión con el servidor.';
+        cargarUsuarios();
       }
-    });
+    }
+
+    cargarUsuarios();
   </script>
+  <script src="common.js"></script>
 </body>
 </html>
