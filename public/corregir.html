@@ -5,24 +5,373 @@
   <title>Corregir Horas</title>
   <link rel="stylesheet" href="style.css">
   <style>
-    .contenedor { max-width: 1100px; margin: 0 auto; padding: 20px; }
+    .contenedor { max-width: 860px; margin: 0 auto; padding: 20px; }
     .boton {
       display: inline-block; padding: 8px 16px; font-size: 14px;
       text-align: center; border: none; border-radius: 6px;
       cursor: pointer; background: #e6007e; color: #fff;
       min-width: 100px; margin: 4px; text-decoration: none;
     }
-    .boton.verde { background: #84ae05; }
     .boton.danger { background: #ea1902; }
-    .boton.gris { background: #888; }
-    .boton:hover { opacity: 0.85; }
+    .boton:hover  { opacity: 0.85; }
 
-    /* Tabs */
-    .tabs { display: flex; gap: 8px; margin-bottom: 24px; justify-content: center; flex-wrap: wrap; }
-    .tab {
-      padding: 10px 24px; font-size: 15px; font-weight: bold;
-      border: 2px solid #e6007e; border-radius: 8px; cursor: pointer;
-      background: #fff; color: #e6007e; transition: all 0.2s;
+    /* Buscador con autocomplete */
+    .search-wrap { position: relative; display: inline-block; margin-right: 6px; }
+    .search-wrap input {
+      padding: 7px 12px; font-size: 14px; width: 250px;
+      border: 1px solid #ccc; border-radius: 6px; outline: none;
     }
-    .tab.activo { background: #e6007e; color: #fff; }‚ˆÊˆ\ØØYÜˆÛÛˆ]]ØÛÛ\]H
-‹ÂˆœÙX\˜Ú]Ü˜\ÈÜÚ][Ûˆ™[]]™NÈ\Ü^Nˆ[›[™KX›ØÚÎÈX\™Ú[‹\šYÚˆœÈBˆœÙX\˜Ú]Ü˜\[œ]ÂˆY[™ÎˆÜLœÈ›Û\Ú^™NˆMÈÚYˆLÂˆ›Ü™\ˆ\ÛÛYØØØÎÈ›Ü™\‹\˜Y]\ÎˆœÈİ][™Nˆ›Û™NÂˆBˆœÙX\˜Ú]Ü˜\[œ]™›Øİ\ÈÈ›Ü™\‹XÛÛÜˆÙMŒÙNÈBˆÜİYÙ\™[˜ÚX\ÈÂˆ\Ü^Nˆ›Û™NÈÜÚ][ÛˆXœÛÛ]NÈYˆÈšYÚˆÈÜˆL	NÂˆ˜XÚÙÜ›İ[™ˆÙ™™È›Ü™\ˆ\ÛÛYØØØÎÈ›Ü™\‹]Üˆ›Û™NÂˆ›Ü™\‹\˜Y]\ÎˆÈX\™Ú[ˆÈY[™ÎˆÂˆ\İ\İ[Nˆ›Û™NÈ‹Z[™^ˆŒÈX^ZZYÚˆŒŒÂˆİ™\™›İË^Nˆ]]ÎÈ›Ş\ÚYİÎˆLœ™Ø˜JŒLŠNÂˆBˆÜİYÙ\™[˜ÚX\ÈHÈY[™Îˆ\MÈİ\œÛÜˆÚ[\È›Û\Ú^™NˆLÜÈ›Ü™\‹X›İÛNˆ\ÛÛYÙŒŒŒÈBˆÜİYÙ\™[˜ÚX\ÈNšİ™\‹ÜİYÙ\™[˜ÚX\ÈK˜Xİ]›ÈÈ˜XÚÙÜ›İ[™ˆÙÙŒ˜È@¢ò¢F&ÆFR&Vv—7G&÷2¢ğ¢7&W7VÇFFòF&ÆRÂ7&W7VÇFFòÖÖ6—fòF&ÆR²v–GFƒ¢S²&÷&FW"Ö6öÆÆ6S¢6öÆÆ6S²föçB×6—¦S¢7ƒ²Ö&v–âÖ&÷GFöÓ¢gƒ²Ğ¢7&W7VÇFFòF‚Â7&W7VÇFFòFBÀ¢7&W7VÇFFòÖÖ6—fòF‚Â7&W7VÇFFòÖÖ6—fòFB²FF–æs¢w‚‡ƒ²&÷&FW#¢‚6öÆ–B6663²FW‡BÖÆ–vã¢ÆVgC²Ğ¢7&W7VÇFFòF‚Â7&W7VÇFFòÖÖ6—fòF‚²&6¶w&÷VæC¢6cVcVcS²föçB×vV–v‡C¢c²Ğ¢7&W7VÇFFò–çWBÂ7&W7VÇFFò6VÆV7BÂ7&W7VÇFFò'WGFöâ²föçB×6—¦S¢7ƒ²FF–æs¢G‚gƒ²&÷‚×6—¦–æs¢&÷&FW"Ö&÷ƒ²v–GFƒ¢S²Ğ
+    .search-wrap input:focus { border-color: #e6007e; }
+    #sugerencias {
+      display: none; position: absolute; left: 0; right: 0; top: 100%;
+      background: #fff; border: 1px solid #ccc; border-top: none;
+      border-radius: 0 0 8px 8px; margin: 0; padding: 0;
+      list-style: none; z-index: 200; max-height: 220px;
+      overflow-y: auto; box-shadow: 0 4px 12px rgba(0,0,0,.12);
+    }
+    #sugerencias li {
+      padding: 9px 14px; cursor: pointer; font-size: 13px;
+      border-bottom: 1px solid #f0f0f0;
+    }
+    #sugerencias li:hover, #sugerencias li.activo { background: #f7f0fb; }
+
+    /* Tabla de registros */
+    #resultado table { width: 100%; border-collapse: collapse; font-size: 13px; margin-bottom: 16px; }
+    #resultado th, #resultado td { padding: 7px 8px; border: 1px solid #ccc; text-align: left; }
+    #resultado th { background: #f5f5f5; font-weight: 600; }
+    #resultado input, #resultado select, #resultado button {
+      font-size: 13px; padding: 4px 6px; box-sizing: border-box; width: 100%;
+    }
+
+    /* SecciÃ³n Agregar Manual */
+    .manual-section {
+      margin-top: 40px; background: #fafafa; border: 1px solid #eee;
+      border-radius: 10px; padding: 24px 28px;
+    }
+    .manual-section h2 { text-align: center; color: #84ae05; margin-top: 0; margin-bottom: 20px; }
+    .manual-grid {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 12px;
+      max-width: 520px; margin: 0 auto;
+    }
+    .manual-grid label { font-size: 13px; color: #555; margin-bottom: 2px; display: block; }
+    .manual-grid select,
+    .manual-grid input {
+      width: 100%; padding: 8px 10px; font-size: 14px;
+      border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box;
+    }
+    .manual-grid select:focus,
+    .manual-grid input:focus { border-color: #e6007e; outline: none; }
+    .manual-grid input[readonly] { background: #f5f5f5; color: #888; }
+    .manual-full { grid-column: 1 / -1; text-align: center; }
+    #mensaje { font-weight: bold; margin-top: 8px; min-height: 20px; text-align: center; }
+  </style>
+</head>
+<body>
+  <script>
+    (function() {
+      if (!sessionStorage.getItem('adminUser')) window.location.replace('admin-login.html');
+    })();
+  </script>
+
+  <div class="contenedor">
+    <img src="logo-dinex.png" alt="Logo DinEX" class="logo" style="display:block;margin:0 auto 16px;max-width:200px;">
+    <h1 style="text-align:center;color:#84ae05;">Corregir Horas</h1>
+
+    <!-- Buscador con autocomplete -->
+    <div style="text-align:center;margin-bottom:24px;">
+      <div class="search-wrap">
+        <input type="text" id="usuario" placeholder="Buscar empleado..."
+          autocomplete="off" oninput="filtrarSugerencias()" onkeydown="teclaLista(event)">
+        <ul id="sugerencias"></ul>
+      </div>
+      <button onclick="buscar()" class="boton">Buscar</button>
+      <a href="admin.html" class="boton">Volver al Panel</a>
+    </div>
+
+    <div id="resultado"></div>
+
+    <!-- Agregar Registro Manual -->
+    <div class="manual-section">
+      <h2>Agregar Registro Manual</h2>
+      <form id="form-agregar-marcaje">
+        <div class="manual-grid">
+
+          <div>
+            <label>Empleado</label>
+            <select id="usuarioManual" required>
+              <option value="">-- Seleccionar empleado --</option>
+            </select>
+          </div>
+
+          <div>
+            <label>Departamento</label>
+            <input type="text" id="departamento" readonly placeholder="Auto">
+          </div>
+
+          <div>
+            <label>Fecha</label>
+            <input type="date" id="fechaManual" required>
+          </div>
+
+          <div>
+            <label>Hora</label>
+            <input type="time" id="horaManual" required>
+          </div>
+
+          <div>
+            <label>Tipo de marcaje</label>
+            <select id="tipoManual" required>
+              <option value="entrada">Entrada</option>
+              <option value="salida_lunch">Lunch Out</option>
+              <option value="entrada_lunch">Lunch In</option>
+              <option value="salida">Salida</option>
+            </select>
+          </div>
+
+          <div style="display:flex;align-items:flex-end;">
+            <button type="submit" class="boton" style="width:100%;margin:0;">Agregar Registro</button>
+          </div>
+
+          <div class="manual-full">
+            <p id="mensaje"></p>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    let mapaDepartamentos = {};
+    let listaEmpleados    = [];
+
+    // â”€â”€ Cargar empleados al abrir la pÃ¡gina â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    window.addEventListener('DOMContentLoaded', async () => {
+      try {
+        const res   = await fetch('/api/empleados');
+        const users = await res.json();
+        listaEmpleados = users;
+
+        // Llenar mapa de departamentos
+        users.forEach(u => { mapaDepartamentos[u.usuario] = u.departamento; });
+
+        // Llenar el <select> del formulario manual
+        const sel = document.getElementById('usuarioManual');
+        users.forEach(u => {
+          const opt = document.createElement('option');
+          opt.value       = u.usuario;
+          opt.textContent = `${u.nombre || u.usuario}  (${u.usuario})`;
+          sel.appendChild(opt);
+        });
+
+        // LÃ­mite de fechas: hoy hasta 18 dÃ­as atrÃ¡s (ciclo de pago)
+        const hoy    = new Date();
+        const max    = hoy.toISOString().split('T')[0];
+        const hace18 = new Date(hoy.getTime() - 18 * 24 * 60 * 60 * 1000);
+        const min    = hace18.toISOString().split('T')[0];
+        const fi = document.getElementById('fechaManual');
+        fi.setAttribute('max', max);
+        fi.setAttribute('min', min);
+
+      } catch (err) {
+        console.error('Error cargando empleados:', err);
+      }
+    });
+
+    // Al seleccionar empleado en el select, auto-llenar departamento
+    document.getElementById('usuarioManual').addEventListener('change', () => {
+      const u = document.getElementById('usuarioManual').value;
+      document.getElementById('departamento').value = mapaDepartamentos[u] || '';
+    });
+
+    // â”€â”€ Autocomplete del buscador â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    function filtrarSugerencias() {
+      const q  = document.getElementById('usuario').value.toLowerCase().trim();
+      const ul = document.getElementById('sugerencias');
+      ul.innerHTML = '';
+      if (!q) { ul.style.display = 'none'; return; }
+
+      const hits = listaEmpleados.filter(u =>
+        u.usuario.toLowerCase().includes(q) ||
+        (u.nombre || '').toLowerCase().includes(q)
+      ).slice(0, 8);
+
+      if (!hits.length) { ul.style.display = 'none'; return; }
+
+      hits.forEach(u => {
+        const li = document.createElement('li');
+        li.innerHTML = `<strong>${u.nombre || u.usuario}</strong> <span style="color:#999;">(${u.usuario})</span>`;
+        li.onclick = () => {
+          document.getElementById('usuario').value = u.usuario;
+          ul.style.display = 'none';
+          buscar();
+        };
+        ul.appendChild(li);
+      });
+      ul.style.display = 'block';
+    }
+
+    function teclaLista(e) {
+      const ul    = document.getElementById('sugerencias');
+      const items = ul.querySelectorAll('li');
+      const act   = ul.querySelector('li.activo');
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        const next = act ? act.nextElementSibling : items[0];
+        if (act) act.classList.remove('activo');
+        if (next) next.classList.add('activo');
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        const prev = act ? act.previousElementSibling : items[items.length - 1];
+        if (act) act.classList.remove('activo');
+        if (prev) prev.classList.add('activo');
+      } else if (e.key === 'Enter') {
+        if (act) { act.click(); return; }
+        ul.style.display = 'none';
+        buscar();
+      } else if (e.key === 'Escape') {
+        ul.style.display = 'none';
+      }
+    }
+
+    document.addEventListener('click', e => {
+      if (!e.target.closest('.search-wrap')) {
+        document.getElementById('sugerencias').style.display = 'none';
+      }
+    });
+
+    // â”€â”€ Auth headers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    function adminHeaders() {
+      return {
+        'Content-Type': 'application/json',
+        'x-admin-auth': JSON.stringify({
+          username: sessionStorage.getItem('adminUser') || '',
+          password: sessionStorage.getItem('adminPass') || ''
+        })
+      };
+    }
+
+    // â”€â”€ Buscar registros de un empleado â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    async function buscar() {
+      const u    = document.getElementById('usuario').value.trim();
+      const cont = document.getElementById('resultado');
+      if (!u) { alert('Ingresa un usuario'); return; }
+
+      try {
+        const res  = await fetch('/api/reporte?usuario=' + encodeURIComponent(u));
+        const data = await res.json();
+
+        if (!data.length) {
+          cont.innerHTML = `<p style="text-align:center;color:#e00;">No se encontraron registros para "<strong>${u}</strong>".</p>`;
+          return;
+        }
+
+        let html = `<table>
+          <tr><th>AcciÃ³n</th><th>Fecha</th><th>Hora</th><th>IP</th><th>Editar</th><th>Eliminar</th></tr>`;
+        data.forEach((r, i) => {
+          const rid = r.id || i;
+          html += `<tr>
+            <td><input id="tipo${i}" value="${r.tipo}"></td>
+            <td><input type="date" id="fecha${i}" value="${r.fecha}"></td>
+            <td><input type="time" id="hora${i}" value="${r.hora ? r.hora.slice(0,5) : ''}"></td>
+            <td>${r.ip || '-'}</td>
+            <td><button onclick="guardar('${u}',${i},${rid})" class="boton">Guardar</button></td>
+            <td><button onclick="borrar(${rid})" class="boton danger">Eliminar</button></td>
+          </tr>`;
+        });
+        html += '</table>';
+        cont.innerHTML = html;
+      } catch (err) {
+        console.error('Error buscando registros:', err);
+      }
+    }
+
+    // â”€â”€ Guardar correcciÃ³n â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    async function guardar(usuario, index, recordId) {
+      try {
+        const tipo    = document.getElementById(`tipo${index}`).value;
+        const fecha   = document.getElementById(`fecha${index}`).value;
+        const horaRaw = document.getElementById(`hora${index}`).value;
+        const hora    = horaRaw.length === 5 ? horaRaw + ':00' : horaRaw;
+
+        if (!fecha || !hora || !tipo) { alert('Completa todos los campos antes de guardar.'); return; }
+
+        const res = await fetch('/api/corregir-hora', {
+          method: 'POST', headers: adminHeaders(),
+          body: JSON.stringify({ usuario, index, recordId, tipo, fecha, hora })
+        });
+        const j = await res.json();
+        if (j.success) buscar();
+        else alert('Error al actualizar. Verifica tu sesiÃ³n de administrador.');
+      } catch (err) {
+        console.error('Error guardando:', err);
+        alert('Error de conexiÃ³n con el servidor.');
+      }
+    }
+
+    // â”€â”€ Eliminar registro â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    async function borrar(recordId) {
+      if (!confirm('Â¿Eliminar este registro?')) return;
+      try {
+        const res = await fetch('/api/borrar-marcaje', {
+          method: 'DELETE', headers: adminHeaders(),
+          body: JSON.stringify({ recordId })
+        });
+        const j = await res.json();
+        if (j.success) buscar();
+        else alert('Error al eliminar. Verifica tu sesiÃ³n de administrador.');
+      } catch (err) {
+        console.error('Error eliminando:', err);
+        alert('Error de conexiÃ³n con el servidor.');
+      }
+    }
+
+    // â”€â”€ Agregar registro manual â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    document.getElementById('form-agregar-marcaje').addEventListener('submit', async function(e) {
+      e.preventDefault();
+      const msgEl      = document.getElementById('mensaje');
+      const usuario    = document.getElementById('usuarioManual').value;
+      const departamento = document.getElementById('departamento').value.trim();
+      const fechaInput = document.getElementById('fechaManual').value;
+      const horaRaw    = document.getElementById('horaManual').value;
+      const hora       = horaRaw.length === 5 ? horaRaw + ':00' : horaRaw;
+      const tipo       = document.getElementById('tipoManual').value;
+
+      if (!usuario) {
+        msgEl.style.color = 'red';
+        msgEl.textContent = 'Selecciona un empleado.';
+        return;
+      }
+
+      const fechaSel = new Date(fechaInput);
+      const hoy = new Date(); hoy.setHours(0,0,0,0);
+      if (fechaSel > hoy) {
+        msgEl.style.color = 'red';
+        msgEl.textContent = 'No puedes registrar una fecha futura.';
+        return;
+      }
+
+      try {
+        const res = await fetch('/api/agregar-marcaje', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ usuario, departamento, tipo, fecha: fechaInput, hora })
+        });
+        const json = await res.json();
+        msgEl.style.color = json.success ? 'green' : 'red';
+        msgEl.textContent = json.mensaje;
+        if (json.success) {
+          document.getElementById('usuario').value = usuario;
+          buscar();
+          this.reset();
+          document.getElementById('departamento').value = '';
+        }
+      } catch (err) {
+        msgEl.style.color = 'red';
+        msgEl.textContent = 'Error de conexiÃ³n con el servidor.';
+        console.error(err);
+      }
+    });
+  </script>
+  <script src="common.js"></script>
+</body>
+</html>
