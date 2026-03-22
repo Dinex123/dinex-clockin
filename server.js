@@ -79,10 +79,12 @@ app.set('trust proxy', true);
 // ==== DB SQLite y esquema ====
 const db = new sqlite3.Database(PATHS.dbFile);
 // WAL mode: permite lecturas simultáneas mientras se escribe
+// WAL mode: permite lecturas simultáneas mientras se escribe (crítico para 45 usuarios)
 db.run('PRAGMA journal_mode=WAL');
 db.run('PRAGMA synchronous=NORMAL');
 db.run('PRAGMA cache_size=-64000'); // 64MB cache
 db.serialize(() => {
+  // Crear tabla base si no existe
   db.run(
     `CREATE TABLE IF NOT EXISTS registros (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -394,6 +396,7 @@ function rateLimitMarcaje(usuario) {
 }
 
 // ==== Marcaje ====
+// 100% SQLite — el JSON solo se mantiene como backup secundario
 app.post('/api/marcar', (req, res) => {
   try {
     const now       = moment().tz('America/Chicago');
@@ -578,6 +581,7 @@ app.get('/api/empleados', (req, res) => {
 app.get('/api/usuarios', (req, res) => {
   try {
     const users = readJsonSafe(PATHS.users, []);
+    // Incluye todos los usuarios (activos e inactivos) para resolución de nombres en reportes
     const nombres = {};
     users.forEach(u => { nombres[u.usuario] = u.nombre; });
     res.json(nombres);

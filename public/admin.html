@@ -241,11 +241,19 @@
         document.getElementById('kpiNo').textContent         = nOff;
         document.getElementById('kpiActivos').textContent    = nAct;
 
+<<<<<<< HEAD
         // Tooltips con nombres + ID (solo al pasar el mouse)
         const listas = d.listas || {};
         const fmt = (arr) => {
           if (!arr || !arr.length) return '—';
           return 'Empleados:\n- ' + arr.join('\n- ');
+=======
+        // Tooltips con nombres + Sede (solo al pasar el mouse)
+        const listas = d.listas || {};
+        const fmt = (arr) => {
+          if (!arr || !arr.length) return '—';
+          return 'Empleados:\n' + arr.map(n => `• ${n}`).join('\n');
+>>>>>>> fa9c66ffad7ffb5c472ff76a425dc91496b23658
         };
         document.getElementById('kpiWork').title  = fmt(listas.trabajandoConId   || listas.trabajando);
         document.getElementById('kpiLunch').title = fmt(listas.enAlmuerzoConId   || listas.enAlmuerzo);
