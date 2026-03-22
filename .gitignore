@@ -2,10 +2,13 @@
 node_modules
 .env
 
-# datos locales (¡no subir!)
+# datos locales (no subir)
 backups
 db
 *.db
 marcajes*.json
 users.json
 admins.json
+supervisors.json
+*.backup
+arreglar-admins.js

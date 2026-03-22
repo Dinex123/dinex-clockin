@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>DinEX — Acceso Supervisor</title>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    body { background: #f5f7fa; }
+    .contenedor { max-width: 380px; margin: 60px auto; padding: 36px 28px;
+      background: #fff; border-radius: 16px; box-shadow: 0 4px 24px rgba(0,0,0,.08); }
+    .logo { max-width: 160px; display: block; margin: 0 auto 20px; }
+    h1 { text-align: center; color: #84ae05; font-size: 22px; margin-bottom: 4px; }
+    .subtitulo { text-align: center; color: #999; font-size: 13px; margin-bottom: 28px; }
+    input { width: 100%; padding: 12px 14px; border: 1px solid #ddd; border-radius: 8px;
+      font-size: 15px; margin-bottom: 14px; box-sizing: border-box; outline: none; }
+    input:focus { border-color: #ec008c; }
+    .boton { width: 100%; padding: 13px; background: #84ae05; color: #fff; border: none;
+      border-radius: 8px; font-size: 16px; font-weight: 600; cursor: pointer; margin-top: 4px; }
+    .boton:hover { background: #6a8e04; }
+    #error { color: #e00; text-align: center; font-size: 13px; margin-top: 10px; min-height: 18px; }
+    .version { text-align: center; color: #ccc; font-size: 11px; margin-top: 24px; }
+  </style>
+</head>
+<body>
+  <div class="contenedor">
+    <img src="logo-dinex.png" alt="DinEX" class="logo">
+    <h1>Acceso Supervisor</h1>
+    <p class="subtitulo">Panel de monitoreo en tiempo real</p>
+    <form id="loginForm" autocomplete="off">
+      <input type="text" id="username" placeholder="Usuario" required autofocus>
+      <input type="password" id="password" placeholder="Contraseña" required>
+      <button type="submit" class="boton" id="btnLogin">Entrar</button>
+      <p id="error"></p>
+    </form>
+    <p class="version">DinEX WebClock · v1.2.0</p>
+  </div>
+  <script src="common.js"></script>
+  <script>
+    document.getElementById('loginForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const btn = document.getElementById('btnLogin');
+      const err = document.getElementById('error');
+      const username = document.getElementById('username').value.trim();
+      const password = document.getElementById('password').value;
+      err.textContent = '';
+      btn.disabled = true; btn.textContent = 'Entrando...';
+      try {
+        const res = await postJSON('/api/supervisor-login', { username, password });
+        if (res && res.success) {
+          sessionStorage.setItem('supervisorUser', username);
+          window.location.href = 'supervisor.html';
+        } else {
+          err.textContent = 'Usuario o contraseña incorrectos';
+        }
+      } catch(ex) {
+        err.textContent = 'Error de conexión';
+      } finally {
+        btn.disabled = false; btn.textContent = 'Entrar';
+      }
+    });
+  </script>
+</body>
+</html>

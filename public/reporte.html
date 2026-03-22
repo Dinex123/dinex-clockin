@@ -71,14 +71,36 @@
   </style>
 </head>
 <body>
+  <script>
+    // Guard de sesión admin - redirige si no hay credenciales
+    (function() {
+      if (!sessionStorage.getItem('adminUser')) {
+        window.location.replace('admin-login.html');
+      }
+    })();
+  </script>
+
   <div class="contenedor">
     <img src="logo-dinex.png" alt="Logo DinEX" class="logo">
     <h1>Reporte de Horas por Empleado</h1>
 
-    <input type="text" id="usuario" placeholder="Usuario" required>
-    <button onclick="cargarReporte()" class="boton">Ver Reporte</button>
-    <button onclick="exportarExcel()" class="boton">Exportar a Excel</button>
-    <button onclick="exportarPDF()" class="boton">Exportar a PDF</button>
+    <div style="margin-bottom:16px; display:flex; flex-wrap:wrap; gap:8px; justify-content:center; align-items:center;">
+      <div style="position:relative;">
+        <input type="text" id="usuarioBusca" placeholder="Buscar por nombre o usuario..."
+          autocomplete="off"
+          style="padding:8px 12px; font-size:14px; width:260px; border:1px solid #ccc; border-radius:6px;"
+          oninput="filtrarEmpleados()" onkeydown="teclaEmpleados(event)">
+        <ul id="listaEmpleados" style="display:none; position:absolute; left:0; right:0; top:100%;
+          background:#fff; border:1px solid #ccc; border-top:none; border-radius:0 0 6px 6px;
+          margin:0; padding:0; list-style:none; z-index:100; max-height:220px; overflow-y:auto;
+          box-shadow:0 4px 10px rgba(0,0,0,.12); text-align:left;"></ul>
+      </div>
+      <input type="hidden" id="usuario">
+      <button onclick="cargarReporte()" class="boton">Ver Reporte</button>
+      <button onclick="exportarExcel()" class="boton">Exportar a Excel</button>
+      <button onclick="exportarPDF()" class="boton">Exportar a PDF</button>
+    </div>
+    <div id="empleadoSeleccionado" style="text-align:center; font-size:13px; color:#666; margin-bottom:4px; min-height:18px;"></div>
 
     <p id="mensaje-reporte"></p>
 
@@ -90,6 +112,80 @@
   <script>
     let datosGlobal = [];
     let totalHorasStr = '';
+    let empleadosActivos = [];
+
+    // Cargar empleados activos al abrir la página
+    async function cargarEmpleadosActivos() {
+      try {
+        const res = await fetch('/api/empleados');
+        empleadosActivos = await res.json();
+      } catch(e) { console.error('Error cargando empleados:', e); }
+    }
+    cargarEmpleadosActivos();
+
+    function filtrarEmpleados() {
+      const q = document.getElementById('usuarioBusca').value.toLowerCase().trim();
+      const ul = document.getElementById('listaEmpleados');
+      ul.innerHTML = '';
+      document.getElementById('usuario').value = '';
+      document.getElementById('empleadoSeleccionado').textContent = '';
+
+      if (!q) { ul.style.display = 'none'; return; }
+      const matches = empleadosActivos.filter(u =>
+        u.usuario.toLowerCase().includes(q) ||
+        (u.nombre || '').toLowerCase().includes(q)
+      ).slice(0, 10);
+
+      if (!matches.length) { ul.style.display = 'none'; return; }
+      matches.forEach(u => {
+        const li = document.createElement('li');
+        li.style.cssText = 'padding:9px 14px; cursor:pointer; font-size:13px; border-bottom:1px solid #f0f0f0;';
+        li.innerHTML = `<strong style="font-size:13px;">${u.nombre || u.usuario}</strong> <span style="color:#999; font-size:12px;">(${u.usuario}) — ${u.departamento || ''}</span>`;
+        li.onmouseenter = () => li.style.background = '#f7f7f7';
+        li.onmouseleave = () => li.style.background = '';
+        li.onclick = () => seleccionarEmpleado(u);
+        ul.appendChild(li);
+      });
+      ul.style.display = 'block';
+    }
+
+    function seleccionarEmpleado(u) {
+      document.getElementById('usuarioBusca').value = u.nombre || u.usuario;
+      document.getElementById('usuario').value = u.usuario;
+      document.getElementById('listaEmpleados').style.display = 'none';
+      document.getElementById('empleadoSeleccionado').textContent =
+        `Empleado seleccionado: ${u.nombre || u.usuario} — ${u.departamento || ''}`;
+      cargarReporte();
+    }
+
+    function teclaEmpleados(e) {
+      const ul = document.getElementById('listaEmpleados');
+      const items = ul.querySelectorAll('li');
+      const activo = ul.querySelector('li.sel');
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        const next = activo ? activo.nextElementSibling : items[0];
+        if (activo) { activo.classList.remove('sel'); activo.style.background = ''; }
+        if (next) { next.classList.add('sel'); next.style.background = '#e8f5e9'; }
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        const prev = activo ? activo.previousElementSibling : items[items.length-1];
+        if (activo) { activo.classList.remove('sel'); activo.style.background = ''; }
+        if (prev) { prev.classList.add('sel'); prev.style.background = '#e8f5e9'; }
+      } else if (e.key === 'Enter') {
+        e.preventDefault();
+        if (activo) activo.click();
+        else if (document.getElementById('usuario').value) cargarReporte();
+      } else if (e.key === 'Escape') {
+        ul.style.display = 'none';
+      }
+    }
+
+    document.addEventListener('click', (e) => {
+      if (!e.target.closest('#usuarioBusca') && !e.target.closest('#listaEmpleados')) {
+        document.getElementById('listaEmpleados').style.display = 'none';
+      }
+    });
 
     function fmtFecha(iso) {
       if (!iso || !iso.includes('-')) return '';
@@ -98,7 +194,7 @@
     }
 
     async function cargarReporte() {
-      const usuario = document.getElementById("usuario").value.trim();
+      const usuario = (document.getElementById("usuario").value || document.getElementById("usuarioBusca").value).trim();
       const mensaje = document.getElementById("mensaje-reporte");
       const cont = document.getElementById("resultado");
 
@@ -114,7 +210,7 @@
       const raw = await res.json().catch(() => []);
 
       if (!raw.length) {
-        mensaje.textContent = "❌ Este empleado ha sido eliminado o no existe.";
+        mensaje.textContent = "❌ No se encontraron registros para este usuario.";
         return;
       }
 
@@ -276,6 +372,17 @@
         doc.save("reporte-usuario.pdf");
       };
     }
+    // Si viene usuario en la URL, cargarlo automáticamente
+    document.addEventListener('DOMContentLoaded', () => {
+      const params = new URLSearchParams(window.location.search);
+      const u = params.get('usuario');
+      if (u) {
+        document.getElementById('usuario').value = u;
+        document.getElementById('usuarioBusca').value = u;
+        cargarReporte();
+      }
+    });
   </script>
+  <script src="common.js"></script>
 </body>
 </html>

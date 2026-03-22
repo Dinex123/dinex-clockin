@@ -5,222 +5,373 @@
   <title>Corregir Horas</title>
   <link rel="stylesheet" href="style.css">
   <style>
-    .contenedor {
-      max-width: 800px;
-      margin: 0 auto;
-      padding: 20px;
-    }
+    .contenedor { max-width: 860px; margin: 0 auto; padding: 20px; }
     .boton {
-      display: inline-block;
-      padding: 8px 16px;
-      font-size: 14px;
-      text-align: center;
-      border: none;
-      border-radius: 6px;
-      cursor: pointer;
-      background: #e6007e;
-      color: #fff;
-      min-width: 100px;
-      margin: 4px;
+      display: inline-block; padding: 8px 16px; font-size: 14px;
+      text-align: center; border: none; border-radius: 6px;
+      cursor: pointer; background: #e6007e; color: #fff;
+      min-width: 100px; margin: 4px; text-decoration: none;
     }
     .boton.danger { background: #ea1902; }
+    .boton:hover  { opacity: 0.85; }
 
-    #resultado table {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: 13px;
-      margin-bottom: 16px;
+    /* Buscador con autocomplete */
+    .search-wrap { position: relative; display: inline-block; margin-right: 6px; }
+    .search-wrap input {
+      padding: 7px 12px; font-size: 14px; width: 250px;
+      border: 1px solid #ccc; border-radius: 6px; outline: none;
     }
-    #resultado th,
-    #resultado td {
-      padding: 6px 8px;
-      border: 1px solid #ccc;
-      text-align: left;
+    .search-wrap input:focus { border-color: #e6007e; }
+    #sugerencias {
+      display: none; position: absolute; left: 0; right: 0; top: 100%;
+      background: #fff; border: 1px solid #ccc; border-top: none;
+      border-radius: 0 0 8px 8px; margin: 0; padding: 0;
+      list-style: none; z-index: 200; max-height: 220px;
+      overflow-y: auto; box-shadow: 0 4px 12px rgba(0,0,0,.12);
     }
-    #resultado input,
-    #resultado select,
-    #resultado button {
-      font-size: 13px;
-      padding: 4px 6px;
-      box-sizing: border-box;
-      width: 100%;
+    #sugerencias li {
+      padding: 9px 14px; cursor: pointer; font-size: 13px;
+      border-bottom: 1px solid #f0f0f0;
     }
+    #sugerencias li:hover, #sugerencias li.activo { background: #f7f0fb; }
+
+    /* Tabla de registros */
+    #resultado table { width: 100%; border-collapse: collapse; font-size: 13px; margin-bottom: 16px; }
+    #resultado th, #resultado td { padding: 7px 8px; border: 1px solid #ccc; text-align: left; }
+    #resultado th { background: #f5f5f5; font-weight: 600; }
+    #resultado input, #resultado select, #resultado button {
+      font-size: 13px; padding: 4px 6px; box-sizing: border-box; width: 100%;
+    }
+
+    /* Sección Agregar Manual */
+    .manual-section {
+      margin-top: 40px; background: #fafafa; border: 1px solid #eee;
+      border-radius: 10px; padding: 24px 28px;
+    }
+    .manual-section h2 { text-align: center; color: #84ae05; margin-top: 0; margin-bottom: 20px; }
+    .manual-grid {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 12px;
+      max-width: 520px; margin: 0 auto;
+    }
+    .manual-grid label { font-size: 13px; color: #555; margin-bottom: 2px; display: block; }
+    .manual-grid select,
+    .manual-grid input {
+      width: 100%; padding: 8px 10px; font-size: 14px;
+      border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box;
+    }
+    .manual-grid select:focus,
+    .manual-grid input:focus { border-color: #e6007e; outline: none; }
+    .manual-grid input[readonly] { background: #f5f5f5; color: #888; }
+    .manual-full { grid-column: 1 / -1; text-align: center; }
+    #mensaje { font-weight: bold; margin-top: 8px; min-height: 20px; text-align: center; }
   </style>
 </head>
 <body>
-  <div class="contenedor">
-    <img src="logo-dinex.png" alt="Logo DinEX" class="logo" style="display:block; margin:0 auto 16px; max-width:200px;">
-    <h1 style="text-align:center; color:#84ae05;">Corregir Horas</h1>
+  <script>
+    (function() {
+      if (!sessionStorage.getItem('adminUser')) window.location.replace('admin-login.html');
+    })();
+  </script>
 
-    <div style="text-align:center; margin-bottom:20px;">
-      <input type="text" id="usuario" placeholder="Usuario" style="padding:6px; font-size:14px; width:200px;">
+  <div class="contenedor">
+    <img src="logo-dinex.png" alt="Logo DinEX" class="logo" style="display:block;margin:0 auto 16px;max-width:200px;">
+    <h1 style="text-align:center;color:#84ae05;">Corregir Horas</h1>
+
+    <!-- Buscador con autocomplete -->
+    <div style="text-align:center;margin-bottom:24px;">
+      <div class="search-wrap">
+        <input type="text" id="usuario" placeholder="Buscar empleado..."
+          autocomplete="off" oninput="filtrarSugerencias()" onkeydown="teclaLista(event)">
+        <ul id="sugerencias"></ul>
+      </div>
       <button onclick="buscar()" class="boton">Buscar</button>
       <a href="admin.html" class="boton">Volver al Panel</a>
     </div>
 
     <div id="resultado"></div>
 
-    <h2 style="margin-top:40px; text-align:center; color:#84ae05;">Agregar Registro Manual</h2>
-    <form id="form-agregar-marcaje" style="text-align:center; margin-bottom:40px;">
-      <input type="text" id="usuarioManual" placeholder="Usuario" required style="padding:6px; margin:6px; width:180px;"><br>
-      <input type="text" id="departamento" placeholder="Departamento" required style="padding:6px; margin:6px; width:180px;" readonly><br>
-      <input type="date" id="fechaManual" max="" min="" required style="padding:6px; margin:6px; width:180px;"><br>
-      <input type="time" id="horaManual" required style="padding:6px; margin:6px; width:180px;"><br>
-      <select id="tipoManual" required style="padding:6px; margin:6px; width:180px;">
-        <option value="entrada">Entrada</option>
-        <option value="salida_lunch">Lunch Out</option>
-        <option value="entrada_lunch">Lunch In</option>
-        <option value="salida">Salida</option>
-      </select><br>
-      <button type="submit" class="boton">Agregar Registro</button>
-      <p id="mensaje" style="font-weight:bold; margin-top:8px;"></p>
-    </form>
+    <!-- Agregar Registro Manual -->
+    <div class="manual-section">
+      <h2>Agregar Registro Manual</h2>
+      <form id="form-agregar-marcaje">
+        <div class="manual-grid">
+
+          <div>
+            <label>Empleado</label>
+            <select id="usuarioManual" required>
+              <option value="">-- Seleccionar empleado --</option>
+            </select>
+          </div>
+
+          <div>
+            <label>Departamento</label>
+            <input type="text" id="departamento" readonly placeholder="Auto">
+          </div>
+
+          <div>
+            <label>Fecha</label>
+            <input type="date" id="fechaManual" required>
+          </div>
+
+          <div>
+            <label>Hora</label>
+            <input type="time" id="horaManual" required>
+          </div>
+
+          <div>
+            <label>Tipo de marcaje</label>
+            <select id="tipoManual" required>
+              <option value="entrada">Entrada</option>
+              <option value="salida_lunch">Lunch Out</option>
+              <option value="entrada_lunch">Lunch In</option>
+              <option value="salida">Salida</option>
+            </select>
+          </div>
+
+          <div style="display:flex;align-items:flex-end;">
+            <button type="submit" class="boton" style="width:100%;margin:0;">Agregar Registro</button>
+          </div>
+
+          <div class="manual-full">
+            <p id="mensaje"></p>
+          </div>
+        </div>
+      </form>
+    </div>
   </div>
 
   <script>
     let mapaDepartamentos = {};
+    let listaEmpleados    = [];
 
-    window.addEventListener("DOMContentLoaded", async () => {
+    // ── Cargar empleados al abrir la página ───────────────────
+    window.addEventListener('DOMContentLoaded', async () => {
       try {
-        const res = await fetch("/api/empleados");
+        const res   = await fetch('/api/empleados');
         const users = await res.json();
+        listaEmpleados = users;
+
+        // Llenar mapa de departamentos
+        users.forEach(u => { mapaDepartamentos[u.usuario] = u.departamento; });
+
+        // Llenar el <select> del formulario manual
+        const sel = document.getElementById('usuarioManual');
         users.forEach(u => {
-          mapaDepartamentos[u.usuario] = u.departamento;
+          const opt = document.createElement('option');
+          opt.value       = u.usuario;
+          opt.textContent = `${u.nombre || u.usuario}  (${u.usuario})`;
+          sel.appendChild(opt);
         });
 
-        // ✅ Límites de fecha: hoy y hace 30 días
-        const hoy = new Date();
-        const maxFecha = hoy.toISOString().split('T')[0];
-        const hace30 = new Date(hoy.getTime() - 30 * 24 * 60 * 60 * 1000);
-        const minFecha = hace30.toISOString().split('T')[0];
+        // Límite de fechas: hoy hasta 18 días atrás (ciclo de pago)
+        const hoy    = new Date();
+        const max    = hoy.toISOString().split('T')[0];
+        const hace18 = new Date(hoy.getTime() - 18 * 24 * 60 * 60 * 1000);
+        const min    = hace18.toISOString().split('T')[0];
+        const fi = document.getElementById('fechaManual');
+        fi.setAttribute('max', max);
+        fi.setAttribute('min', min);
 
-        const fechaInput = document.getElementById("fechaManual");
-        fechaInput.setAttribute("max", maxFecha);
-        fechaInput.setAttribute("min", minFecha);
       } catch (err) {
-        console.error("Error cargando empleados:", err);
+        console.error('Error cargando empleados:', err);
       }
     });
 
-    document.getElementById("usuarioManual").addEventListener("input", () => {
-      const usuario = document.getElementById("usuarioManual").value.trim();
-      document.getElementById("departamento").value = mapaDepartamentos[usuario] || "";
+    // Al seleccionar empleado en el select, auto-llenar departamento
+    document.getElementById('usuarioManual').addEventListener('change', () => {
+      const u = document.getElementById('usuarioManual').value;
+      document.getElementById('departamento').value = mapaDepartamentos[u] || '';
     });
 
+    // ── Autocomplete del buscador ─────────────────────────────
+    function filtrarSugerencias() {
+      const q  = document.getElementById('usuario').value.toLowerCase().trim();
+      const ul = document.getElementById('sugerencias');
+      ul.innerHTML = '';
+      if (!q) { ul.style.display = 'none'; return; }
+
+      const hits = listaEmpleados.filter(u =>
+        u.usuario.toLowerCase().includes(q) ||
+        (u.nombre || '').toLowerCase().includes(q)
+      ).slice(0, 8);
+
+      if (!hits.length) { ul.style.display = 'none'; return; }
+
+      hits.forEach(u => {
+        const li = document.createElement('li');
+        li.innerHTML = `<strong>${u.nombre || u.usuario}</strong> <span style="color:#999;">(${u.usuario})</span>`;
+        li.onclick = () => {
+          document.getElementById('usuario').value = u.usuario;
+          ul.style.display = 'none';
+          buscar();
+        };
+        ul.appendChild(li);
+      });
+      ul.style.display = 'block';
+    }
+
+    function teclaLista(e) {
+      const ul    = document.getElementById('sugerencias');
+      const items = ul.querySelectorAll('li');
+      const act   = ul.querySelector('li.activo');
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        const next = act ? act.nextElementSibling : items[0];
+        if (act) act.classList.remove('activo');
+        if (next) next.classList.add('activo');
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        const prev = act ? act.previousElementSibling : items[items.length - 1];
+        if (act) act.classList.remove('activo');
+        if (prev) prev.classList.add('activo');
+      } else if (e.key === 'Enter') {
+        if (act) { act.click(); return; }
+        ul.style.display = 'none';
+        buscar();
+      } else if (e.key === 'Escape') {
+        ul.style.display = 'none';
+      }
+    }
+
+    document.addEventListener('click', e => {
+      if (!e.target.closest('.search-wrap')) {
+        document.getElementById('sugerencias').style.display = 'none';
+      }
+    });
+
+    // ── Auth headers ──────────────────────────────────────────
+    function adminHeaders() {
+      return {
+        'Content-Type': 'application/json',
+        'x-admin-auth': JSON.stringify({
+          username: sessionStorage.getItem('adminUser') || '',
+          password: sessionStorage.getItem('adminPass') || ''
+        })
+      };
+    }
+
+    // ── Buscar registros de un empleado ───────────────────────
     async function buscar() {
-      const u = document.getElementById("usuario").value.trim();
-      if (!u) {
-        alert("Ingresa un usuario");
-        return;
-      }
+      const u    = document.getElementById('usuario').value.trim();
+      const cont = document.getElementById('resultado');
+      if (!u) { alert('Ingresa un usuario'); return; }
+
       try {
-        const res = await fetch("/api/reporte?usuario=" + encodeURIComponent(u));
+        const res  = await fetch('/api/reporte?usuario=' + encodeURIComponent(u));
         const data = await res.json();
-        const cont = document.getElementById("resultado");
 
         if (!data.length) {
-          cont.innerHTML = "<p style='text-align:center;'>No hay registros para este usuario.</p>";
+          cont.innerHTML = `<p style="text-align:center;color:#e00;">No se encontraron registros para "<strong>${u}</strong>".</p>`;
           return;
         }
 
         let html = `<table>
-          <tr>
-            <th>Acción</th><th>Fecha</th><th>Hora</th><th>IP</th><th>Editar</th><th>Eliminar</th>
-          </tr>`;
+          <tr><th>Acción</th><th>Fecha</th><th>Hora</th><th>IP</th><th>Editar</th><th>Eliminar</th></tr>`;
         data.forEach((r, i) => {
+          const rid = r.id || i;
           html += `<tr>
             <td><input id="tipo${i}" value="${r.tipo}"></td>
             <td><input type="date" id="fecha${i}" value="${r.fecha}"></td>
-            <td><input type="time" id="hora${i}" value="${r.hora}"></td>
-            <td>${r.ip}</td>
-            <td><button onclick="guardar('${u}',${i})" class="boton">Guardar</button></td>
-            <td><button onclick="borrar('${u}',${i})" class="boton danger">Eliminar</button></td>
+            <td><input type="time" id="hora${i}" value="${r.hora ? r.hora.slice(0,5) : ''}"></td>
+            <td>${r.ip || '-'}</td>
+            <td><button onclick="guardar('${u}',${i},${rid})" class="boton">Guardar</button></td>
+            <td><button onclick="borrar(${rid})" class="boton danger">Eliminar</button></td>
           </tr>`;
         });
-        html += `</table>`;
+        html += '</table>';
         cont.innerHTML = html;
       } catch (err) {
-        console.error("Error buscando registros:", err);
+        console.error('Error buscando registros:', err);
       }
     }
 
-    async function guardar(usuario, index) {
+    // ── Guardar corrección ────────────────────────────────────
+    async function guardar(usuario, index, recordId) {
       try {
-        const tipo = document.getElementById(`tipo${index}`).value;
-        const fecha = document.getElementById(`fecha${index}`).value;
-        const hora = document.getElementById(`hora${index}`).value;
+        const tipo    = document.getElementById(`tipo${index}`).value;
+        const fecha   = document.getElementById(`fecha${index}`).value;
+        const horaRaw = document.getElementById(`hora${index}`).value;
+        const hora    = horaRaw.length === 5 ? horaRaw + ':00' : horaRaw;
 
-        const res = await fetch("/api/corregir-hora", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ usuario, index, tipo, fecha, hora })
+        if (!fecha || !hora || !tipo) { alert('Completa todos los campos antes de guardar.'); return; }
+
+        const res = await fetch('/api/corregir-hora', {
+          method: 'POST', headers: adminHeaders(),
+          body: JSON.stringify({ usuario, index, recordId, tipo, fecha, hora })
         });
         const j = await res.json();
-        alert(j.success ? "Registro actualizado" : "Error al actualizar");
         if (j.success) buscar();
+        else alert('Error al actualizar. Verifica tu sesión de administrador.');
       } catch (err) {
-        console.error("Error guardando registro:", err);
+        console.error('Error guardando:', err);
+        alert('Error de conexión con el servidor.');
       }
     }
 
-    async function borrar(usuario, index) {
-      if (!confirm("¿Eliminar este registro?")) return;
+    // ── Eliminar registro ─────────────────────────────────────
+    async function borrar(recordId) {
+      if (!confirm('¿Eliminar este registro?')) return;
       try {
-        const res = await fetch("/api/borrar-marcaje", {
-          method: "DELETE",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ usuario, index })
+        const res = await fetch('/api/borrar-marcaje', {
+          method: 'DELETE', headers: adminHeaders(),
+          body: JSON.stringify({ recordId })
         });
         const j = await res.json();
-        alert(j.success ? "Registro eliminado" : "Error al eliminar");
         if (j.success) buscar();
+        else alert('Error al eliminar. Verifica tu sesión de administrador.');
       } catch (err) {
-        console.error("Error eliminando registro:", err);
+        console.error('Error eliminando:', err);
+        alert('Error de conexión con el servidor.');
       }
     }
 
-    document.getElementById("form-agregar-marcaje").addEventListener("submit", async function (e) {
+    // ── Agregar registro manual ───────────────────────────────
+    document.getElementById('form-agregar-marcaje').addEventListener('submit', async function(e) {
       e.preventDefault();
+      const msgEl      = document.getElementById('mensaje');
+      const usuario    = document.getElementById('usuarioManual').value;
+      const departamento = document.getElementById('departamento').value.trim();
+      const fechaInput = document.getElementById('fechaManual').value;
+      const horaRaw    = document.getElementById('horaManual').value;
+      const hora       = horaRaw.length === 5 ? horaRaw + ':00' : horaRaw;
+      const tipo       = document.getElementById('tipoManual').value;
 
-      const fechaInput = document.getElementById("fechaManual").value;
-      const fechaSeleccionada = new Date(fechaInput);
-      const hoy = new Date();
-      hoy.setHours(0, 0, 0, 0);
-
-      const msgEl = document.getElementById("mensaje");
-
-      if (fechaSeleccionada > hoy) {
-        msgEl.textContent = "No puedes registrar una fecha futura.";
-        msgEl.style.color = "red";
+      if (!usuario) {
+        msgEl.style.color = 'red';
+        msgEl.textContent = 'Selecciona un empleado.';
         return;
       }
 
-      const usuario = document.getElementById("usuarioManual").value.trim();
-      const departamento = document.getElementById("departamento").value.trim();
-      const hora = document.getElementById("horaManual").value;
-      const tipo = document.getElementById("tipoManual").value;
+      const fechaSel = new Date(fechaInput);
+      const hoy = new Date(); hoy.setHours(0,0,0,0);
+      if (fechaSel > hoy) {
+        msgEl.style.color = 'red';
+        msgEl.textContent = 'No puedes registrar una fecha futura.';
+        return;
+      }
 
       try {
-        const res = await fetch("/api/agregar-marcaje", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
+        const res = await fetch('/api/agregar-marcaje', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ usuario, departamento, tipo, fecha: fechaInput, hora })
         });
         const json = await res.json();
+        msgEl.style.color = json.success ? 'green' : 'red';
         msgEl.textContent = json.mensaje;
-        msgEl.style.color = json.success ? "green" : "red";
         if (json.success) {
-          document.getElementById("usuario").value = usuario;
+          document.getElementById('usuario').value = usuario;
           buscar();
+          this.reset();
+          document.getElementById('departamento').value = '';
         }
       } catch (err) {
-        msgEl.textContent = "Error al agregar registro.";
-        msgEl.style.color = "red";
+        msgEl.style.color = 'red';
+        msgEl.textContent = 'Error de conexión con el servidor.';
         console.error(err);
       }
     });
   </script>
+  <script src="common.js"></script>
 </body>
 </html>
-
-

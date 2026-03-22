@@ -119,6 +119,15 @@
   </style>
 </head>
 <body>
+  <script>
+    // Guard de sesión admin - redirige si no hay credenciales
+    (function() {
+      if (!sessionStorage.getItem('adminUser')) {
+        window.location.replace('admin-login.html');
+      }
+    })();
+  </script>
+
   <div class="menu-bar">
     <h1>Usuarios Inactivos</h1>
     <div class="dropdown">
@@ -160,6 +169,12 @@
       </thead>
       <tbody></tbody>
     </table>
+
+    <!-- Resumen de horas -->
+    <div id="resumen-horas" style="display:none; margin: 20px auto; max-width:600px; background:#f7fff0; border:1px solid #c5e1a5; border-radius:12px; padding:16px 24px;">
+      <h3 style="color:#4a7c00; margin:0 0 12px 0; font-size:16px;">📊 Resumen de horas trabajadas</h3>
+      <div id="resumen-horas-contenido" style="font-size:14px; color:#333;"></div>
+    </div>
   </div>
 
   <!-- Logo oculto para incrustar en PDF -->
@@ -219,7 +234,11 @@
             <td>${formatearFecha(emp.fecha_baja)}</td>
           `;
           tr.style.cursor = 'pointer';
-          tr.addEventListener('click', () => mostrarBitacora(index));
+          tr.addEventListener('click', () => {
+            document.querySelectorAll('#tabla-inactivos tbody tr').forEach(r => r.style.background = '');
+            tr.style.background = '#e8f5e9';
+            mostrarBitacora(index);
+          });
           tbody.appendChild(tr);
         });
       } catch (err) {
@@ -228,10 +247,48 @@
       }
     }
 
+    function calcularHoras(registros) {
+      // Agrupa por fecha y calcula horas por día (entrada → salida)
+      const porDia = {};
+      registros.forEach(r => {
+        if (!r.fecha) return;
+        if (!porDia[r.fecha]) porDia[r.fecha] = [];
+        porDia[r.fecha].push(r);
+      });
+
+      let totalMs = 0;
+      let diasTrabajados = 0;
+      const detalleDias = [];
+
+      Object.entries(porDia).sort().forEach(([fecha, regs]) => {
+        const entradas = regs.filter(x => x.tipo === 'entrada').sort((a,b) => (a.hora||'').localeCompare(b.hora||''));
+        const salidas  = regs.filter(x => x.tipo === 'salida').sort((a,b) => (a.hora||'').localeCompare(b.hora||''));
+        if (entradas.length && salidas.length) {
+          const ini = new Date(`${fecha}T${entradas[0].hora}`);
+          const fin = new Date(`${fecha}T${salidas[salidas.length-1].hora}`);
+          if (!isNaN(ini) && !isNaN(fin) && fin > ini) {
+            const ms = fin - ini;
+            totalMs += ms;
+            diasTrabajados++;
+            const h = Math.floor(ms / 3600000);
+            const m = Math.floor((ms % 3600000) / 60000);
+            detalleDias.push({ fecha, horas: h, minutos: m });
+          }
+        }
+      });
+
+      const totalH = Math.floor(totalMs / 3600000);
+      const totalM = Math.floor((totalMs % 3600000) / 60000);
+      return { totalH, totalM, diasTrabajados, detalleDias };
+    }
+
     function mostrarBitacora(index) {
       const tbody = document.querySelector('#tabla-bitacora tbody');
       tbody.innerHTML = '';
       const infoBit = document.getElementById('infoBitacora');
+      const resumenDiv = document.getElementById('resumen-horas');
+      const resumenContenido = document.getElementById('resumen-horas-contenido');
+      resumenDiv.style.display = 'none';
 
       const empleado = dataInactivos[index];
       nombreEmpleadoActual = empleado.nombre;
@@ -254,6 +311,31 @@
         `;
         tbody.appendChild(tr);
       });
+
+      // Calcular y mostrar resumen de horas
+      const { totalH, totalM, diasTrabajados, detalleDias } = calcularHoras(registros);
+      if (diasTrabajados > 0) {
+        let html = `
+          <div style="display:flex; gap:30px; flex-wrap:wrap; margin-bottom:12px;">
+            <div><span style="font-size:28px; font-weight:800; color:#4a7c00;">${totalH}h ${totalM}m</span><br><span style="color:#777; font-size:12px;">Total horas trabajadas</span></div>
+            <div><span style="font-size:28px; font-weight:800; color:#4a7c00;">${diasTrabajados}</span><br><span style="color:#777; font-size:12px;">Días trabajados</span></div>
+            <div><span style="font-size:28px; font-weight:800; color:#4a7c00;">${diasTrabajados ? (totalH / diasTrabajados).toFixed(1) : 0}h</span><br><span style="color:#777; font-size:12px;">Promedio por día</span></div>
+          </div>
+          <details style="font-size:13px; color:#555;">
+            <summary style="cursor:pointer; color:#4a7c00; font-weight:600;">Ver detalle por día</summary>
+            <table style="width:100%; margin-top:8px; border-collapse:collapse; font-size:13px;">
+              <thead><tr>
+                <th style="text-align:left; padding:4px 8px; border-bottom:1px solid #ccc;">Fecha</th>
+                <th style="text-align:left; padding:4px 8px; border-bottom:1px solid #ccc;">Horas trabajadas</th>
+              </tr></thead>
+              <tbody>
+                ${detalleDias.map(d => `<tr><td style="padding:4px 8px;">${formatearFecha(d.fecha)}</td><td style="padding:4px 8px;">${d.horas}h ${d.minutos}m</td></tr>`).join('')}
+              </tbody>
+            </table>
+          </details>`;
+        resumenContenido.innerHTML = html;
+        resumenDiv.style.display = 'block';
+      }
     }
 
     async function exportarBitacoraPDF() {
@@ -274,6 +356,18 @@
       doc.setFontSize(12);
       doc.text(`Record del Empleado: ${nombreEmpleadoActual}`, 14, 20);
 
+      // Resumen de horas
+      const empIndex = dataInactivos.findIndex(e => e.nombre === nombreEmpleadoActual);
+      let startY = 30;
+      if (empIndex !== -1) {
+        const { totalH, totalM, diasTrabajados } = calcularHoras(dataInactivos[empIndex].registros || []);
+        doc.setFontSize(10);
+        doc.setTextColor(74, 124, 0);
+        doc.text(`Total horas trabajadas: ${totalH}h ${totalM}m   |   Días trabajados: ${diasTrabajados}   |   Promedio/día: ${diasTrabajados ? (totalH/diasTrabajados).toFixed(1) : 0}h`, 14, 30);
+        doc.setTextColor(0);
+        startY = 38;
+      }
+
       const filas = [];
       document.querySelectorAll("#tabla-bitacora tbody tr").forEach(tr => {
         const celdas = [...tr.children].map(td => td.textContent.trim());
@@ -283,7 +377,7 @@
       doc.autoTable({
         head: [["Fecha y Hora", "Tipo de Marcaje", "Dirección IP", "Departamento"]],
         body: filas,
-        startY: 30
+        startY: startY
       });
 
       const nombreArchivo = `bitacora_${nombreEmpleadoActual.replace(/ /g, "_").toLowerCase()}.pdf`;
@@ -292,15 +386,35 @@
 
     function exportarBitacoraExcel() {
       if (!nombreEmpleadoActual) return alert("Selecciona un empleado.");
-      const tabla = document.getElementById("tabla-bitacora");
+      const empIndex = dataInactivos.findIndex(e => e.nombre === nombreEmpleadoActual);
       const wb = XLSX.utils.book_new();
+
+      // Hoja 1: Bitácora
+      const tabla = document.getElementById("tabla-bitacora");
       const ws = XLSX.utils.table_to_sheet(tabla);
       XLSX.utils.book_append_sheet(wb, ws, "Bitacora");
+
+      // Hoja 2: Resumen de horas
+      if (empIndex !== -1) {
+        const { totalH, totalM, diasTrabajados, detalleDias } = calcularHoras(dataInactivos[empIndex].registros || []);
+        const resumenData = [
+          { Concepto: 'Empleado', Valor: nombreEmpleadoActual },
+          { Concepto: 'Total horas trabajadas', Valor: `${totalH}h ${totalM}m` },
+          { Concepto: 'Días trabajados', Valor: diasTrabajados },
+          { Concepto: 'Promedio por día', Valor: `${diasTrabajados ? (totalH/diasTrabajados).toFixed(1) : 0}h` },
+          {},
+          ...detalleDias.map(d => ({ Concepto: formatearFecha(d.fecha), Valor: `${d.horas}h ${d.minutos}m` }))
+        ];
+        const ws2 = XLSX.utils.json_to_sheet(resumenData);
+        XLSX.utils.book_append_sheet(wb, ws2, "Resumen Horas");
+      }
+
       const nombreArchivo = `bitacora_${nombreEmpleadoActual.replace(/ /g, "_").toLowerCase()}.xlsx`;
       XLSX.writeFile(wb, nombreArchivo);
     }
 
     document.addEventListener('DOMContentLoaded', cargarEmpleadosInactivos);
   </script>
+  <script src="common.js"></script>
 </body>
 </html>

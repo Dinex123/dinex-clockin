@@ -76,21 +76,42 @@
     .kpi--total { background:#f3f4f6; border-top:3px solid #9ca3af; }
 
     #chartEstado{ margin-bottom:6px; }
+
+    /* Barra de inactividad */
+    #inactivity-bar-wrap {
+      max-width: 500px; margin: 6px auto 0;
+      background: #e0e0e0; border-radius: 8px; height: 8px; overflow: hidden;
+    }
+    #inactivity-bar {
+      height: 100%; width: 100%; background: #84a900; border-radius: 8px;
+    }
   </style>
 </head>
 <body>
+  <script>
+    (function() {
+      if (!sessionStorage.getItem('adminUser')) {
+        window.location.replace('admin-login.html');
+      }
+    })();
+  </script>
+
   <div class="contenedor">
     <img src="logo-dinex.png" alt="Logo DinEX" class="logo" />
     <h1>Panel de Administración</h1>
+
+    <!-- ===== Timer de inactividad visual ===== -->
+    <div id="inactivity-bar-wrap">
+      <div id="inactivity-bar"></div>
+    </div>
+    <span id="inactivity-label" style="display:block;text-align:center;font-size:11px;color:#666;margin-bottom:6px;">Sesión activa</span>
 
     <div class="menu">
       <div class="submenu">
         <button class="boton"><i data-lucide="users"></i>Gestión</button>
         <div class="submenu-contenido">
           <a href="crear-usuario.html"><i data-lucide="user-plus"></i>Crear Usuario</a>
-          <a href="eliminar.html"><i data-lucide="user-minus"></i>Eliminar Usuario</a>
-          <a href="desactivar.html"><i data-lucide="user-x"></i>Desactivar Usuario</a>
-          <a href="activar.html"><i data-lucide="user-check"></i>Activar Usuario</a>
+          <a href="eliminar.html"><i data-lucide="users"></i>Gestionar Usuarios</a>
         </div>
       </div>
 
@@ -108,6 +129,7 @@
         <div class="submenu-contenido">
           <a href="empleados.html"><i data-lucide="users"></i>Usuarios</a>
           <a href="empleados_inactivos.html"><i data-lucide="user-x"></i>Empleados Inactivos</a>
+          <a href="supervisores.html"><i data-lucide="monitor"></i>Supervisores</a>
           <a href="#" id="btnLogout"><i data-lucide="log-out"></i>Cerrar Sesión</a>
         </div>
       </div>
@@ -147,16 +169,43 @@
   <script>
     lucide.createIcons();
 
-    // 🔒 Cierre por inactividad (30 min)
-    let tiempoInactividad;
+    // 🔒 Cierre por inactividad con barra visual (30 min)
+    const TIMEOUT_ADMIN = 30 * 60 * 1000;
+    const WARNING_ADMIN =  3 * 60 * 1000;
+    let timerAdminID, startAdmin, rafAdmin;
+    const barAdmin   = document.getElementById('inactivity-bar');
+    const labelAdmin = document.getElementById('inactivity-label');
+
+    function animarBarraAdmin() {
+      const elapsed = Date.now() - startAdmin;
+      const pct     = Math.min(elapsed / TIMEOUT_ADMIN, 1);
+      const restMs  = Math.max(TIMEOUT_ADMIN - elapsed, 0);
+      const restMin = Math.floor(restMs / 60000);
+      const restSec = Math.floor((restMs % 60000) / 1000);
+      barAdmin.style.width = (100 - pct * 100).toFixed(1) + '%';
+      if (restMs <= WARNING_ADMIN) {
+        barAdmin.style.background = '#ea1902';
+        labelAdmin.style.color    = '#ea1902';
+        labelAdmin.textContent    = `⚠️ Sesión admin cierra en ${restMin}:${String(restSec).padStart(2,'0')} min`;
+      } else {
+        barAdmin.style.background = '#84a900';
+        labelAdmin.style.color    = '#666';
+        labelAdmin.textContent    = `Sesión activa — cierra en ${restMin}:${String(restSec).padStart(2,'0')} min`;
+      }
+      if (pct < 1) rafAdmin = requestAnimationFrame(animarBarraAdmin);
+    }
+
     function cerrarSesionPorInactividad(){
       alert("Sesión cerrada por inactividad.");
       sessionStorage.clear();
       window.location.href = "admin-login.html";
     }
     function reiniciarTemporizador(){
-      clearTimeout(tiempoInactividad);
-      tiempoInactividad = setTimeout(cerrarSesionPorInactividad, 30*60*1000);
+      clearTimeout(timerAdminID);
+      cancelAnimationFrame(rafAdmin);
+      startAdmin = Date.now();
+      animarBarraAdmin();
+      timerAdminID = setTimeout(cerrarSesionPorInactividad, TIMEOUT_ADMIN);
     }
     ['click','mousemove','keypress','scroll','touchstart'].forEach(e =>
       document.addEventListener(e, reiniciarTemporizador)
@@ -192,16 +241,28 @@
         document.getElementById('kpiNo').textContent         = nOff;
         document.getElementById('kpiActivos').textContent    = nAct;
 
-        // Tooltips con nombres (solo al pasar el mouse)
+        // Tooltips con nombres + ID (solo al pasar el mouse)
         const listas = d.listas || {};
         const fmt = (arr) => {
           if (!arr || !arr.length) return '—';
-          return 'Nombres:\n- ' + arr.join('\n- ');
+          return 'Empleados:\n- ' + arr.join('\n- ');
         };
-        document.getElementById('kpiWork').title  = fmt(listas.trabajando);
-        document.getElementById('kpiLunch').title = fmt(listas.enAlmuerzo);
-        document.getElementById('kpiOff').title   = fmt(listas.noTrabajando);
+        document.getElementById('kpiWork').title  = fmt(listas.trabajandoConId   || listas.trabajando);
+        document.getElementById('kpiLunch').title = fmt(listas.enAlmuerzoConId   || listas.enAlmuerzo);
+        document.getElementById('kpiOff').title   = fmt(listas.noTrabajandoConId || listas.noTrabajando);
         document.getElementById('kpiTotal').title = fmt(listas.activos);
+
+        // Cargar lista de usuarios con ID para enriquecer la dona
+        let usersConId = {};
+        try {
+          const ru = await fetch('/api/empleados-ids');
+          if (ru.ok) usersConId = await ru.json(); // { nombre: id }
+        } catch(e) { /* no bloqueante */ }
+
+        // Usar las listas con ID que devuelve el servidor directamente
+        const listaTrabajando   = (listas.trabajandoConId   || listas.trabajando   || []);
+        const listaAlmuerzo     = (listas.enAlmuerzoConId   || listas.enAlmuerzo   || []);
+        const listaNoTrabajando = (listas.noTrabajandoConId || listas.noTrabajando || []);
 
         // Gráfica dona
         const ctx = document.getElementById('chartEstado');
@@ -224,7 +285,14 @@
                 legend: { position: 'bottom', labels: { usePointStyle: true } },
                 tooltip: {
                   callbacks: {
-                    label: (ctx) => `${ctx.label}: ${ctx.parsed}`
+                    label: (tooltipItem) => {
+                      const idx   = tooltipItem.dataIndex;
+                      const count = tooltipItem.parsed;
+                      const listas = [listaTrabajando, listaAlmuerzo, listaNoTrabajando];
+                      const lista  = listas[idx] || [];
+                      if (!count) return `${tooltipItem.label}: 0`;
+                      return [`${tooltipItem.label}: ${count}`, ...lista.map(n => `  • ${n}`)];
+                    }
                   }
                 }
               }

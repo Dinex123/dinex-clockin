@@ -83,6 +83,15 @@
   </style>
 </head>
 <body>
+  <script>
+    // Guard de sesión admin - redirige si no hay credenciales
+    (function() {
+      if (!sessionStorage.getItem('adminUser')) {
+        window.location.replace('admin-login.html');
+      }
+    })();
+  </script>
+
   <div class="contenedor">
     <img src="logo-dinex.png" alt="Logo DinEX" class="logo">
     <h1>Resumen por Empleado</h1>
@@ -268,6 +277,9 @@
         doc.save('resumen-empleados.pdf');
       };
     }
+    // Cargar datos automáticamente al abrir la página
+    document.addEventListener('DOMContentLoaded', cargarResumen);
   </script>
+  <script src="common.js"></script>
 </body>
 </html>
