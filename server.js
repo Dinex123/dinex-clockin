@@ -147,7 +147,7 @@ app.use((req, res, next) => {
   res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
   res.setHeader(
     'Content-Security-Policy',
-    "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://unpkg.com; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self';"
+    "default-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://unpkg.com https://cdnjs.cloudflare.com data:;"
   );
   next();
 });
@@ -1014,3 +1014,4 @@ process.on('SIGTERM', () => {
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`DinEX WebClock escuchando en puerto ${PORT}`);
 });
+
