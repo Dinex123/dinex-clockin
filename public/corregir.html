@@ -14,6 +14,9 @@
     }
     .boton.danger { background: #ea1902; }
     .boton:hover  { opacity: 0.85; }
+    /* Botón verde igual al resto del sistema */
+    .boton.verde  { background: #84ae05; }
+    .boton.verde:hover { background: #6a8c04; opacity: 1; }
 
     /* Buscador con autocomplete */
     .search-wrap { position: relative; display: inline-block; margin-right: 6px; }
@@ -42,6 +45,98 @@
     #resultado input, #resultado select, #resultado button {
       font-size: 13px; padding: 4px 6px; box-sizing: border-box; width: 100%;
     }
+
+    /* ═══════════════════════════════════════════════
+       PANEL VER TODOS LOS EMPLEADOS (NUEVO - SEGURO)
+       ═══════════════════════════════════════════════ */
+    #panel-todos {
+      display: none; /* empieza oculto, se abre con el botón */
+      margin: 0 0 28px 0;
+      background: #fafafa;
+      border: 1px solid #e0e0e0;
+      border-radius: 10px;
+      padding: 20px 24px;
+    }
+    #panel-todos h2 {
+      text-align: center;
+      color: #84ae05;
+      margin-top: 0;
+      margin-bottom: 6px;
+      font-size: 18px;
+    }
+    #panel-todos .subtitulo-panel {
+      text-align: center;
+      color: #888;
+      font-size: 13px;
+      margin-bottom: 16px;
+    }
+    /* Barra de búsqueda dentro del panel */
+    #filtro-todos-wrap {
+      display: flex;
+      justify-content: center;
+      gap: 8px;
+      margin-bottom: 14px;
+      flex-wrap: wrap;
+    }
+    #filtro-todos {
+      padding: 7px 12px; font-size: 14px; width: 260px;
+      border: 1px solid #ccc; border-radius: 6px; outline: none;
+    }
+    #filtro-todos:focus { border-color: #84ae05; }
+    /* Tabla de empleados dentro del panel */
+    #tabla-todos-wrap {
+      max-height: 340px;
+      overflow-y: auto;
+      border: 1px solid #e0e0e0;
+      border-radius: 6px;
+    }
+    #tabla-todos {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+    #tabla-todos thead tr {
+      position: sticky;
+      top: 0;
+      background: #f5f5f5;
+      z-index: 1;
+    }
+    #tabla-todos th {
+      padding: 9px 10px;
+      border-bottom: 2px solid #ddd;
+      font-weight: 600;
+      text-align: left;
+      white-space: nowrap;
+    }
+    #tabla-todos td {
+      padding: 8px 10px;
+      border-bottom: 1px solid #f0f0f0;
+    }
+    #tabla-todos tbody tr:hover {
+      background: #f7f0fb;
+      cursor: pointer;
+    }
+    #tabla-todos tbody tr.revisado td {
+      background: #f0fff0;
+      color: #3a7a3a;
+    }
+    #tabla-todos .badge-revisado {
+      display: inline-block;
+      background: #84ae05;
+      color: #fff;
+      font-size: 11px;
+      border-radius: 4px;
+      padding: 2px 7px;
+      margin-left: 6px;
+    }
+    #contador-panel {
+      text-align: center;
+      font-size: 13px;
+      color: #666;
+      margin-top: 10px;
+    }
+    #contador-panel strong { color: #84ae05; }
+    /* ══════════════════════════════════════════════ */
 
     /* Sección Agregar Manual */
     .manual-section {
@@ -86,8 +181,53 @@
       </div>
       <button onclick="buscar()" class="boton">Buscar</button>
       <a href="admin.html" class="boton">Volver al Panel</a>
-      <a href="reporte-todos.html" class="boton verde">📋 Corrección Quincenal Masiva</a>
+      <!-- ── BOTÓN NUEVO: abre/cierra el panel de todos los empleados ── -->
+      <button onclick="togglePanelTodos()" class="boton verde" id="btn-ver-todos">
+        👥 Ver Todos los Empleados
+      </button>
     </div>
+
+    <!-- ═══════════════════════════════════════════════════════════
+         PANEL NUEVO: Lista de todos los empleados para revisión
+         Este panel NO modifica nada solo muestra y ayuda a navegar
+         ═══════════════════════════════════════════════════════════ -->
+    <div id="panel-todos">
+      <h2>📋 Lista de Empleados — Revisión Quincenal</h2>
+      <p class="subtitulo-panel">
+        Haz clic en cualquier empleado para cargar sus registros arriba y revisarlos.
+        Los marcados en <span style="color:#3a7a3a;font-weight:bold;">verde</span> ya fueron revisados esta sesión.
+      </p>
+
+      <!-- Filtro por nombre dentro del panel -->
+      <div id="filtro-todos-wrap">
+        <input type="text" id="filtro-todos" placeholder="Filtrar por nombre o usuario..."
+               oninput="filtrarTablaTodos()">
+        <button onclick="limpiarFiltroTodos()" class="boton" style="font-size:12px;padding:6px 12px;min-width:auto;">
+          Limpiar
+        </button>
+      </div>
+
+      <!-- Tabla de empleados -->
+      <div id="tabla-todos-wrap">
+        <table id="tabla-todos">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Nombre</th>
+              <th>Usuario</th>
+              <th>Departamento</th>
+              <th>Estado</th>
+            </tr>
+          </thead>
+          <tbody id="cuerpo-tabla-todos">
+            <!-- Se llena automáticamente con JavaScript -->
+          </tbody>
+        </table>
+      </div>
+
+      <p id="contador-panel">Cargando empleados…</p>
+    </div>
+    <!-- ═══════════════════════════════════════ FIN PANEL NUEVO ═══ -->
 
     <div id="resultado"></div>
 
@@ -144,6 +284,8 @@
   <script>
     let mapaDepartamentos = {};
     let listaEmpleados    = [];
+    // Guarda los usuarios ya revisados en esta sesión (solo visual, no toca la BD)
+    let empleadosRevisados = new Set();
 
     // ── Cargar empleados al abrir la página ───────────────────
     window.addEventListener('DOMContentLoaded', async () => {
@@ -164,6 +306,9 @@
           sel.appendChild(opt);
         });
 
+        // Llenar la tabla del panel de todos los empleados
+        llenarTablaTodos(users);
+
         // Límite de fechas: hoy hasta 18 días atrás (ciclo de pago)
         const hoy    = new Date();
         const max    = hoy.toISOString().split('T')[0];
@@ -183,6 +328,111 @@
       const u = document.getElementById('usuarioManual').value;
       document.getElementById('departamento').value = mapaDepartamentos[u] || '';
     });
+
+    // ── PANEL TODOS: Mostrar / Ocultar ────────────────────────
+    function togglePanelTodos() {
+      const panel = document.getElementById('panel-todos');
+      const btn   = document.getElementById('btn-ver-todos');
+      if (panel.style.display === 'none' || panel.style.display === '') {
+        panel.style.display = 'block';
+        btn.textContent = '✖ Cerrar Lista';
+        // Hacer scroll suave hacia el panel
+        panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      } else {
+        panel.style.display = 'none';
+        btn.textContent = '👥 Ver Todos los Empleados';
+      }
+    }
+
+    // ── PANEL TODOS: Llenar tabla ─────────────────────────────
+    function llenarTablaTodos(users) {
+      const tbody = document.getElementById('cuerpo-tabla-todos');
+      tbody.innerHTML = '';
+
+      users.forEach((u, i) => {
+        const tr = document.createElement('tr');
+        tr.dataset.usuario = u.usuario;
+        tr.dataset.nombre  = (u.nombre || '').toLowerCase();
+        tr.title = `Clic para ver registros de ${u.nombre || u.usuario}`;
+
+        tr.innerHTML = `
+          <td style="color:#aaa;font-size:12px;">${i + 1}</td>
+          <td><strong>${u.nombre || u.usuario}</strong></td>
+          <td style="color:#666;">${u.usuario}</td>
+          <td style="color:#666;">${u.departamento || '—'}</td>
+          <td id="estado-${u.usuario}" style="color:#aaa;font-size:12px;">Pendiente</td>
+        `;
+
+        // Al hacer clic en la fila, carga los registros de ese empleado
+        tr.addEventListener('click', () => {
+          seleccionarEmpleadoDesdePanel(u.usuario);
+        });
+
+        tbody.appendChild(tr);
+      });
+
+      actualizarContador();
+    }
+
+    // ── PANEL TODOS: Seleccionar empleado desde la tabla ──────
+    function seleccionarEmpleadoDesdePanel(usuarioId) {
+      // 1) Poner el nombre en el buscador principal
+      document.getElementById('usuario').value = usuarioId;
+      // 2) Buscar sus registros (misma función que ya usabas)
+      buscar();
+      // 3) Marcar visualmente como "revisado" en la tabla
+      marcarComoRevisado(usuarioId);
+      // 4) Hacer scroll hacia los resultados
+      setTimeout(() => {
+        document.getElementById('resultado').scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 300);
+    }
+
+    // ── PANEL TODOS: Marcar empleado como revisado ────────────
+    function marcarComoRevisado(usuarioId) {
+      empleadosRevisados.add(usuarioId);
+      const fila = document.querySelector(`#cuerpo-tabla-todos tr[data-usuario="${usuarioId}"]`);
+      if (fila) {
+        fila.classList.add('revisado');
+        const estadoTd = document.getElementById(`estado-${usuarioId}`);
+        if (estadoTd) {
+          estadoTd.innerHTML = '<span class="badge-revisado">✔ Revisado</span>';
+        }
+      }
+      actualizarContador();
+    }
+
+    // ── PANEL TODOS: Actualizar contador de progreso ──────────
+    function actualizarContador() {
+      const total     = listaEmpleados.length;
+      const revisados = empleadosRevisados.size;
+      const pendientes = total - revisados;
+      const contEl = document.getElementById('contador-panel');
+      if (total === 0) {
+        contEl.innerHTML = 'No hay empleados activos.';
+        return;
+      }
+      contEl.innerHTML =
+        `Total: <strong>${total}</strong> empleados &nbsp;|&nbsp; ` +
+        `<strong style="color:#84ae05;">${revisados} revisados</strong> &nbsp;|&nbsp; ` +
+        `<strong style="color:#e6007e;">${pendientes} pendientes</strong>`;
+    }
+
+    // ── PANEL TODOS: Filtrar tabla por texto ──────────────────
+    function filtrarTablaTodos() {
+      const q = document.getElementById('filtro-todos').value.toLowerCase().trim();
+      const filas = document.querySelectorAll('#cuerpo-tabla-todos tr');
+      filas.forEach(tr => {
+        const usuario = (tr.dataset.usuario || '').toLowerCase();
+        const nombre  = (tr.dataset.nombre  || '').toLowerCase();
+        tr.style.display = (!q || usuario.includes(q) || nombre.includes(q)) ? '' : 'none';
+      });
+    }
+
+    function limpiarFiltroTodos() {
+      document.getElementById('filtro-todos').value = '';
+      filtrarTablaTodos();
+    }
 
     // ── Autocomplete del buscador ─────────────────────────────
     function filtrarSugerencias() {
@@ -256,6 +506,11 @@
       const u    = document.getElementById('usuario').value.trim();
       const cont = document.getElementById('resultado');
       if (!u) { alert('Ingresa un usuario'); return; }
+
+      // Si el panel está abierto, marcar como revisado automáticamente
+      if (document.getElementById('panel-todos').style.display === 'block') {
+        marcarComoRevisado(u);
+      }
 
       try {
         const res  = await fetch('/api/reporte?usuario=' + encodeURIComponent(u));
