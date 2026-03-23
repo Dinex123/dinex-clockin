@@ -890,14 +890,17 @@ app.get('/api/resumen-estado-hoy', (req, res) => {
 
         for (const [usuario, regs] of porUsuario.entries()) {
           const nombre = nameByUser.get(usuario) || usuario;
-          const conId  = `${nombre} (ID: ${usuario})`;
           if (!regs.length) {
+            const conId = `${nombre} (Sin marcaje hoy)`;
             noTrabajandoNombres.push(nombre);
             noTrabajandoConId.push(conId);
             continue;
           }
           regs.sort((a, b) => (a.hora || '').localeCompare(b.hora || ''));
           const ult = regs[regs.length - 1];
+          // Mostrar TX-XXX si el último marcaje tiene geofenceId, si no mostrar "Fuera de sede"
+          const sede  = (ult && ult.geofenceId) ? ult.geofenceId : 'Fuera de sede';
+          const conId = `${nombre} (${sede})`;
           if (ult && ult.tipo === SALE_ALMUERZO) {
             enAlmuerzoNombres.push(nombre);
             enAlmuerzoConId.push(conId);
