@@ -414,6 +414,17 @@ app.post('/api/marcar', (req, res) => {
       return res.status(400).json({ success: false, mensaje: 'Faltan datos requeridos.' });
     }
 
+    // [FIX M-3] Bloquear marcajes desde celulares y tablets
+    // Solo se permiten marcajes desde computadoras de escritorio / laptop
+    const uaLower = (userAgent || '').toLowerCase();
+    const esCelular = /android|iphone|ipad|ipod|mobile|phone|tablet|blackberry|windows phone/i.test(uaLower);
+    if (esCelular) {
+      return res.status(403).json({
+        success: false,
+        mensaje: '⛔ Marcaje no permitido desde celular o tablet. Usa la computadora de la tienda.'
+      });
+    }
+
     // [FIX M-2] Validar tipo de marcaje contra lista permitida
     const tiposValidos = ['entrada', 'salida_lunch', 'entrada_lunch', 'salida'];
     if (!tiposValidos.includes(tipo)) {
