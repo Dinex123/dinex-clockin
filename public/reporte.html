@@ -279,8 +279,11 @@
         const entradas = regs.filter(x => x.tipo === 'entrada').sort((a,b) => (a.hora || '').localeCompare(b.hora || ''));
         const salidas  = regs.filter(x => x.tipo === 'salida').sort((a,b) => (a.hora || '').localeCompare(b.hora || ''));
         if (entradas.length && salidas.length) {
-          const inicio = new Date(`${fecha}T${entradas[0].hora}`);
-          const fin    = new Date(`${fecha}T${salidas[salidas.length-1].hora}`);
+          // Ignorar segundos: tomar solo HH:MM para evitar decimales por segundos acumulados
+          const horaIni = (entradas[0].hora || '').slice(0, 5);
+          const horaFin = (salidas[salidas.length-1].hora || '').slice(0, 5);
+          const inicio = new Date(`${fecha}T${horaIni}:00`);
+          const fin    = new Date(`${fecha}T${horaFin}:00`);
           if (!isNaN(inicio) && !isNaN(fin) && fin > inicio) {
             totalMs += (fin - inicio);
           }
