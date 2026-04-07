@@ -672,7 +672,7 @@
       try {
         const res = await fetch('/api/agregar-marcaje', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: adminHeaders(),
           body: JSON.stringify({ usuario, departamento, tipo, fecha: fechaInput, hora })
         });
         const json = await res.json();
