@@ -458,20 +458,39 @@ app.post('/api/marcar', (req, res) => {
       return res.status(403).json({ success: false, mensaje: 'Marcaje rechazado: estás fuera del área permitida.' });
     }
 
+    // Buscar registros de hoy y hasta 7 días atrás para detectar días sin salida
+    const hace7dias = moment(now).subtract(7, 'days').format('YYYY-MM-DD');
     db.all(
-      `SELECT tipo, fecha, auto FROM registros WHERE usuario = ? AND fecha IN (?, ?) ORDER BY fecha, hora`,
-      [usuario, fechaAyer, fechaHoy],
+      `SELECT tipo, fecha, auto FROM registros WHERE usuario = ? AND fecha >= ? AND fecha <= ? ORDER BY fecha, hora`,
+      [usuario, hace7dias, fechaHoy],
       (err, rows) => {
         if (err) {
           console.error('marcar SELECT:', err.message);
           return res.status(500).json({ success: false, mensaje: 'Error interno al verificar marcajes.' });
         }
 
-        const registrosAyer = rows.filter(r => r.fecha === fechaAyer);
-        const registrosHoy  = rows.filter(r => r.fecha === fechaHoy);
+        const registrosHoy = rows.filter(r => r.fecha === fechaHoy);
 
-        const huboEntradaAyer = registrosAyer.some(r => r.tipo === 'entrada');
-        const huboSalidaAyer  = registrosAyer.some(r => r.tipo === 'salida');
+        // Buscar el día más reciente (antes de hoy) que tuvo entrada pero no salida
+        const diasPasados = [...new Set(
+          rows.filter(r => r.fecha < fechaHoy).map(r => r.fecha)
+        )].sort().reverse();
+
+        let diaIncompleto = null;
+        for (const dia of diasPasados) {
+          const regsDelDia = rows.filter(r => r.fecha === dia);
+          const tieneEntrada = regsDelDia.some(r => r.tipo === 'entrada');
+          const tieneSalida  = regsDelDia.some(r => r.tipo === 'salida');
+          if (tieneEntrada && !tieneSalida) {
+            diaIncompleto = dia;
+            break;
+          }
+        }
+
+        // Compatibilidad con lógica anterior
+        const registrosAyer = rows.filter(r => r.fecha === fechaAyer);
+        const huboEntradaAyer = !!diaIncompleto;
+        const huboSalidaAyer  = !diaIncompleto;
         let advertencia = '';
 
         const insertarMarcajeFinal = () => {
@@ -523,19 +542,19 @@ app.post('/api/marcar', (req, res) => {
         };
 
         if (huboEntradaAyer && !huboSalidaAyer) {
-          advertencia = '⚠️ Ayer no marcaste salida. Se registró salida automática a las 19:30.';
+          advertencia = `⚠️ El ${diaIncompleto} no marcaste salida. Se registró salida automática a las 7:30 PM.`;
           db.run(
             `INSERT INTO registros
               (usuario, tipo, fecha, hora, ip, departamento, lat, lng, accuracy,
                insideGeofence, geofenceId, geofenceName, distanceToCenterM, userAgent, auto)
              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-            [usuario, 'salida', fechaAyer, '19:30:00', ip, departamento,
+            [usuario, 'salida', diaIncompleto, '19:30:00', ip, departamento,
              null, null, null, null, null, null, null, null, 1],
             (errAuto) => {
               if (errAuto) console.error('SQLite auto-salida:', errAuto.message);
               try {
                 const all = readJsonSafe(PATHS.marcajes, []);
-                all.push({ usuario, tipo: 'salida', fecha: fechaAyer, hora: '19:30:00',
+                all.push({ usuario, tipo: 'salida', fecha: diaIncompleto, hora: '19:30:00',
                            ip, departamento, auto: true });
                 writeJsonSafe(PATHS.marcajes, all);
               } catch(e) { /* no-crítico */ }
