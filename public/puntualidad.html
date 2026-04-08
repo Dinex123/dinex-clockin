@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Reporte de Puntualidad</title>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    .contenedor { max-width: 960px; margin: 0 auto; padding: 20px; }
+
+    .boton {
+      display: inline-block; padding: 8px 18px; font-size: 14px;
+      border: none; border-radius: 6px; cursor: pointer;
+      background: #e6007e; color: #fff; margin: 4px; text-decoration: none;
+    }
+    .boton:hover { opacity: 0.85; }
+    .boton.gris  { background: #888; }
+    .boton.gris:hover { opacity: 0.85; }
+
+    /* Barra de búsqueda */
+    .filtro-wrap {
+      display: flex; justify-content: center; align-items: center;
+      gap: 10px; flex-wrap: wrap;
+      background: #fafafa; border: 1px solid #e0e0e0;
+      border-radius: 10px; padding: 16px 20px; margin-bottom: 20px;
+    }
+    .filtro-wrap label { font-size: 13px; color: #555; font-weight: 600; }
+    .filtro-wrap input[type="date"] {
+      padding: 7px 10px; font-size: 14px;
+      border: 1px solid #ccc; border-radius: 6px; outline: none;
+    }
+    .filtro-wrap input[type="date"]:focus { border-color: #e6007e; }
+
+    /* Reglas configurables */
+    .reglas-wrap {
+      display: flex; justify-content: center; align-items: center;
+      gap: 16px; flex-wrap: wrap;
+      font-size: 13px; color: #555;
+      margin-bottom: 16px;
+    }
+    .reglas-wrap label { font-weight: 600; }
+    .reglas-wrap input[type="time"] {
+      padding: 5px 8px; font-size: 13px;
+      border: 1px solid #ccc; border-radius: 6px; outline: none; width: 100px;
+    }
+    .reglas-wrap input[type="number"] {
+      padding: 5px 8px; font-size: 13px;
+      border: 1px solid #ccc; border-radius: 6px; outline: none; width: 60px;
+    }
+    .reglas-wrap input:focus { border-color: #e6007e; }
+
+    /* Mensaje de estado */
+    #msg-estado {
+      text-align: center; font-size: 14px; font-weight: 600;
+      min-height: 20px; margin: 8px 0;
+    }
+
+    /* Resumen chips */
+    .resumen-bar {
+      display: flex; gap: 12px; flex-wrap: wrap;
+      justify-content: center; margin-bottom: 16px;
+    }
+    .chip {
+      padding: 6px 14px; border-radius: 20px;
+      font-size: 13px; font-weight: 600;
+    }
+    .chip-total  { background: #f3f4f6; color: #333; }
+    .chip-tarde  { background: #fce4ec; color: #b71c1c; }
+    .chip-lunch  { background: #fff3e0; color: #b26000; }
+    .chip-ok     { background: #e7f7e7; color: #167c16; }
+
+    /* Tabla */
+    #tabla-wrap table {
+      width: 100%; border-collapse: collapse; font-size: 13px;
+    }
+    #tabla-wrap th {
+      background: #e6007e; color: #fff;
+      padding: 10px 10px; text-align: left; font-weight: 600;
+    }
+    #tabla-wrap td {
+      padding: 9px 10px; border-bottom: 1px solid #f0f0f0;
+    }
+    #tabla-wrap tr:hover td { background: #fdf4fb; }
+
+    /* Badges de estado */
+    .badge {
+      display: inline-block; padding: 3px 9px; border-radius: 12px;
+      font-size: 11px; font-weight: 700;
+    }
+    .badge-tarde  { background: #fce4ec; color: #b71c1c; }
+    .badge-lunch  { background: #fff3e0; color: #b26000; }
+    .badge-ok     { background: #e7f7e7; color: #167c16; }
+    .badge-nodata { background: #f3f4f6; color: #888; }
+
+    /* Sin datos */
+    .sin-datos {
+      text-align: center; padding: 40px 20px;
+      color: #84ae05; font-size: 15px; font-weight: 600;
+    }
+    .sin-datos-warn {
+      text-align: center; padding: 40px 20px;
+      color: #888; font-size: 14px;
+    }
+  </style>
+</head>
+<body>
+  <script>
+    (function() {
+      if (!sessionStorage.getItem('adminUser')) window.location.replace('admin-login.html');
+    })();
+  </script>
+
+  <div class="contenedor">
+    <img src="logo-dinex.png" alt="Logo DinEX" class="logo"
+         style="display:block;margin:0 auto 16px;max-width:200px;">
+    <h1 style="text-align:center;color:#84ae05;">Reporte de Puntualidad</h1>
+    <p style="text-align:center;color:#888;font-size:13px;margin-top:-10px;margin-bottom:20px;">
+      Consulta quién llegó tarde o tomó más tiempo del permitido en el lunch.
+    </p>
+
+    <!-- ══ FILTROS ══ -->
+    <div class="filtro-wrap">
+      <label>📅 Fecha:</label>
+      <input type="date" id="fechaSelec" max="">
+      <button onclick="buscarPuntualidad()" class="boton">🔍 Ver Reporte</button>
+      <a href="admin.html" class="boton gris">Volver al Panel</a>
+    </div>
+
+    <!-- ══ REGLAS ══ -->
+    <div class="reglas-wrap">
+      <span>⚙️ Reglas:</span>
+      <label>Entrada límite:
+        <input type="time" id="limiteEntrada" value="09:30">
+      </label>
+      <label>Lunch máximo (min):
+        <input type="number" id="limiteLunch" value="60" min="1" max="240">
+      </label>
+    </div>
+
+    <!-- ══ ESTADO ══ -->
+    <p id="msg-estado"></p>
+
+    <!-- ══ RESUMEN ══ -->
+    <div class="resumen-bar" id="resumen-bar" style="display:none;"></div>
+
+    <!-- ══ TABLA ══ -->
+    <div id="tabla-wrap"></div>
+  </div>
+
+  <script>
+    // ── Fijar fecha máxima = hoy ──────────────────────────────
+    window.addEventListener('DOMContentLoaded', () => {
+      const hoy = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Chicago' });
+      document.getElementById('fechaSelec').max = hoy;
+      document.getElementById('fechaSelec').value = hoy;
+    });
+
+    // ── Helpers ───────────────────────────────────────────────
+    function fmtFecha(f) {
+      if (!f) return '';
+      const [a, m, d] = f.split('-');
+      return `${m}/${d}/${a}`;
+    }
+
+    function hhmm(horaStr) {
+      // Devuelve "HH:MM" de un string "HH:MM:SS" o "HH:MM"
+      return (horaStr || '').slice(0, 5);
+    }
+
+    function horaAMinutos(horaStr) {
+      // Convierte "HH:MM" en minutos totales desde medianoche
+      const [h, m] = (horaStr || '00:00').split(':').map(Number);
+      return h * 60 + m;
+    }
+
+    function setMsg(txt, color) {
+      const el = document.getElementById('msg-estado');
+      el.style.color = color || '#333';
+      el.innerHTML = txt;
+    }
+
+    // ── Buscar puntualidad ────────────────────────────────────
+    async function buscarPuntualidad() {
+      const fecha = document.getElementById('fechaSelec').value;
+      const limiteEntradaStr = document.getElementById('limiteEntrada').value || '09:30';
+      const limiteLunchMins  = parseInt(document.getElementById('limiteLunch').value) || 60;
+
+      if (!fecha) {
+        setMsg('⚠️ Selecciona una fecha.', '#e6007e');
+        return;
+      }
+
+      setMsg('⏳ Cargando registros...', '#888');
+      document.getElementById('resumen-bar').style.display = 'none';
+      document.getElementById('tabla-wrap').innerHTML = '';
+
+      try {
+        // Usar endpoints existentes — sin tocar nada del backend
+        const [datosRes, nombresRes] = await Promise.all([
+          fetch('/api/reporte-todos'),
+          fetch('/api/usuarios')
+        ]);
+
+        const todos   = await datosRes.json();
+        const nombres = await nombresRes.json(); // { usuario: nombre }
+
+        // Filtrar solo la fecha seleccionada
+        const delDia = todos.filter(r => r.fecha === fecha);
+
+        if (!delDia.length) {
+          setMsg('', '');
+          document.getElementById('tabla-wrap').innerHTML =
+            `<div class="sin-datos-warn">No hay registros para el ${fmtFecha(fecha)}.</div>`;
+          return;
+        }
+
+        // Agrupar por usuario
+        const porUsuario = {};
+        delDia.forEach(r => {
+          if (!porUsuario[r.usuario]) porUsuario[r.usuario] = [];
+          porUsuario[r.usuario].push(r);
+        });
+
+        // Obtener lista de empleados activos para incluirlos aunque no hayan marcado
+        const empRes  = await fetch('/api/empleados');
+        const empList = await empRes.json();
+
+        const limiteEntradaMins = horaAMinutos(limiteEntradaStr);
+        const resultados = [];
+
+        // Procesar cada usuario que tiene registros ese día
+        Object.entries(porUsuario).forEach(([usuario, regs]) => {
+          regs.sort((a, b) => (a.hora || '').localeCompare(b.hora || ''));
+
+          const nombre = nombres[usuario] || usuario;
+
+          // Entrada
+          const regEntrada = regs.find(r => r.tipo === 'entrada');
+          const horaEntrada = regEntrada ? hhmm(regEntrada.hora) : null;
+          let minsTarde = 0;
+          let esTarde = false;
+          if (horaEntrada) {
+            const entradaMins = horaAMinutos(horaEntrada);
+            if (entradaMins > limiteEntradaMins) {
+              minsTarde = entradaMins - limiteEntradaMins;
+              esTarde = true;
+            }
+          }
+
+          // Lunch
+          const regSalidaLunch  = regs.find(r => r.tipo === 'salida_lunch');
+          const regEntradaLunch = regs.find(r => r.tipo === 'entrada_lunch');
+          let tiempoLunchMins = null;
+          let excesoLunchMins = 0;
+          let tieneExcesoLunch = false;
+
+          if (regSalidaLunch && regEntradaLunch) {
+            const salidaMins  = horaAMinutos(hhmm(regSalidaLunch.hora));
+            const regresoMins = horaAMinutos(hhmm(regEntradaLunch.hora));
+            tiempoLunchMins = regresoMins - salidaMins;
+            if (tiempoLunchMins > limiteLunchMins) {
+              excesoLunchMins = tiempoLunchMins - limiteLunchMins;
+              tieneExcesoLunch = true;
+            }
+          }
+
+          resultados.push({
+            usuario,
+            nombre,
+            horaEntrada,
+            minsTarde,
+            esTarde,
+            horaLunch: regSalidaLunch  ? hhmm(regSalidaLunch.hora)  : null,
+            horaRegreso: regEntradaLunch ? hhmm(regEntradaLunch.hora) : null,
+            tiempoLunchMins,
+            excesoLunchMins,
+            tieneExcesoLunch
+          });
+        });
+
+        // Ordenar: primero los tardíos, luego exceso lunch, luego ok
+        resultados.sort((a, b) => {
+          const aProb = (a.esTarde ? 2 : 0) + (a.tieneExcesoLunch ? 1 : 0);
+          const bProb = (b.esTarde ? 2 : 0) + (b.tieneExcesoLunch ? 1 : 0);
+          return bProb - aProb || a.nombre.localeCompare(b.nombre);
+        });
+
+        // Contadores para resumen
+        const totalTarde  = resultados.filter(r => r.esTarde).length;
+        const totalLunch  = resultados.filter(r => r.tieneExcesoLunch).length;
+        const totalOk     = resultados.filter(r => !r.esTarde && !r.tieneExcesoLunch).length;
+
+        // Mostrar resumen
+        const resBar = document.getElementById('resumen-bar');
+        resBar.style.display = 'flex';
+        resBar.innerHTML = `
+          <span class="chip chip-total">👥 Total: ${resultados.length}</span>
+          ${totalTarde  ? `<span class="chip chip-tarde">⏰ Tarde: ${totalTarde}</span>` : ''}
+          ${totalLunch  ? `<span class="chip chip-lunch">🍽️ Exceso lunch: ${totalLunch}</span>` : ''}
+          <span class="chip chip-ok">✅ Puntuales: ${totalOk}</span>
+        `;
+
+        // Construir tabla
+        let html = `
+          <h3 style="color:#84ae05;margin-bottom:10px;">
+            📋 Puntualidad del ${fmtFecha(fecha)}
+            <span style="font-size:12px;color:#888;font-weight:normal;">
+              — Entrada límite: ${limiteEntradaStr} | Lunch máximo: ${limiteLunchMins} min
+            </span>
+          </h3>
+          <table>
+            <thead>
+              <tr>
+                <th>Empleado</th>
+                <th>Hora de entrada</th>
+                <th>Tardanza</th>
+                <th>Lunch salida</th>
+                <th>Lunch regreso</th>
+                <th>Tiempo lunch</th>
+                <th>Exceso lunch</th>
+                <th>Estado</th>
+              </tr>
+            </thead>
+            <tbody>
+        `;
+
+        resultados.forEach(r => {
+          const estadoBadges = [];
+          if (r.esTarde)          estadoBadges.push(`<span class="badge badge-tarde">⏰ Tarde</span>`);
+          if (r.tieneExcesoLunch) estadoBadges.push(`<span class="badge badge-lunch">🍽️ Exceso lunch</span>`);
+          if (!r.esTarde && !r.tieneExcesoLunch) estadoBadges.push(`<span class="badge badge-ok">✅ Puntual</span>`);
+
+          html += `
+            <tr>
+              <td><strong>${r.nombre}</strong></td>
+              <td>${r.horaEntrada
+                ? `<span style="color:${r.esTarde ? '#b71c1c' : '#167c16'};font-weight:600;">${r.horaEntrada}</span>`
+                : `<span class="badge badge-nodata">Sin entrada</span>`}</td>
+              <td>${r.esTarde
+                ? `<span style="color:#b71c1c;font-weight:600;">+${r.minsTarde} min</span>`
+                : `<span style="color:#167c16;">—</span>`}</td>
+              <td>${r.horaLunch   || '<span style="color:#aaa;">—</span>'}</td>
+              <td>${r.horaRegreso || '<span style="color:#aaa;">—</span>'}</td>
+              <td>${r.tiempoLunchMins !== null
+                ? `<span style="color:${r.tieneExcesoLunch ? '#b26000' : '#333'};font-weight:${r.tieneExcesoLunch ? '600' : 'normal'};">${r.tiempoLunchMins} min</span>`
+                : '<span style="color:#aaa;">—</span>'}</td>
+              <td>${r.tieneExcesoLunch
+                ? `<span style="color:#b26000;font-weight:600;">+${r.excesoLunchMins} min</span>`
+                : `<span style="color:#167c16;">—</span>`}</td>
+              <td>${estadoBadges.join(' ')}</td>
+            </tr>
+          `;
+        });
+
+        html += '</tbody></table>';
+        document.getElementById('tabla-wrap').innerHTML = html;
+        setMsg(`✅ Reporte generado — ${resultados.length} empleados con registros el ${fmtFecha(fecha)}.`, '#84ae05');
+
+      } catch(e) {
+        console.error(e);
+        setMsg('❌ Error de conexión con el servidor.', '#e6007e');
+      }
+    }
+  </script>
+  <script src="common.js"></script>
+</body>
+</html>
