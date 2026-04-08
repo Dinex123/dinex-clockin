@@ -160,11 +160,18 @@
         <div class="regla-card">
           <div class="titulo">🟢 Entrada</div>
           <div class="campo">
+            <span>Hora mínima:</span>
+            <input type="time" id="regla-entrada-min" value="09:30">
+          </div>
+          <div style="font-size:11px;color:#888;margin-top:2px;">
+            Si entró antes → se ajusta a esta hora
+          </div>
+          <div class="campo" style="margin-top:6px;">
             <span>Hora máxima:</span>
             <input type="time" id="regla-entrada-max" value="09:30">
           </div>
-          <div style="font-size:11px;color:#888;margin-top:4px;">
-            Si entró antes → se ajusta a esta hora
+          <div style="font-size:11px;color:#888;margin-top:2px;">
+            Si entró después → se ajusta a esta hora
           </div>
         </div>
         <div class="regla-card">
@@ -281,7 +288,10 @@
     // ── Obtener reglas del formulario ─────────────────────────
     function obtenerReglas() {
       return {
-        entrada:       { max: document.getElementById('regla-entrada-max').value },
+        entrada: {
+          min: document.getElementById('regla-entrada-min').value,
+          max: document.getElementById('regla-entrada-max').value
+        },
         salida_lunch:  { max: document.getElementById('regla-sl-max').value },
         entrada_lunch: { min: document.getElementById('regla-el-min').value },
         salida:        { max: document.getElementById('regla-salida-max').value }

@@ -1161,12 +1161,26 @@ app.post('/api/normalizar-preview', verificarAdmin, (req, res) => {
       (err, rows) => {
         if (err) return res.status(500).json({ success: false, mensaje: 'Error leyendo DB.' });
 
-        // Reglas de normalización
+        // Reglas de normalización — ahora con min Y max para entrada
+        // El frontend envía las reglas configuradas por el admin
+        const reglasBody = (req.body && req.body.reglas) || {};
         const REGLAS = {
-          entrada:       { min: null, max: '09:30' }, // si entra antes de 9:30 → 9:30
-          salida_lunch:  { min: null, max: '13:00' }, // si sale a lunch después de 1pm → 1pm
-          entrada_lunch: { min: '14:00', max: null }, // si regresa antes de 2pm → 2pm
-          salida:        { min: null, max: '19:30' }  // si sale después de 7:30pm → 7:30pm
+          entrada: {
+            min: (reglasBody.entrada && reglasBody.entrada.min) || null, // si entró antes → ajustar
+            max: (reglasBody.entrada && reglasBody.entrada.max) || '09:30' // si entró después → ajustar
+          },
+          salida_lunch: {
+            min: null,
+            max: (reglasBody.salida_lunch && reglasBody.salida_lunch.max) || '13:00'
+          },
+          entrada_lunch: {
+            min: (reglasBody.entrada_lunch && reglasBody.entrada_lunch.min) || '14:00',
+            max: null
+          },
+          salida: {
+            min: null,
+            max: (reglasBody.salida && reglasBody.salida.max) || '19:30'
+          }
         };
 
         const cambios = [];
