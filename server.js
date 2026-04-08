@@ -211,7 +211,13 @@ const MODO_ESTRICTO = false;
 
 // ==== Middleware verificar admin (sin cambios — mantiene compatibilidad total) ====
 function verificarAdmin(req, res, next) {
-  const { username, password } = req.headers['x-admin-auth'] ? JSON.parse(req.headers['x-admin-auth']) : {};
+  let username, password;
+  try {
+    const raw = req.headers['x-admin-auth'];
+    if (raw) ({ username, password } = JSON.parse(raw));
+  } catch (_) {
+    return res.status(401).json({ success: false, mensaje: 'No autorizado.' });
+  }
   const admins = readJsonSafe(PATHS.admins, []);
   const valid = admins.some(a => a.username === username && bcrypt.compareSync(password || '', a.password));
   if (!valid) return res.status(401).json({ success: false, mensaje: 'No autorizado.' });
