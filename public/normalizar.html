@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Normalizar Horarios</title>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    .contenedor { max-width: 1000px; margin: 0 auto; padding: 20px; }
+    .boton {
+      display: inline-block; padding: 8px 18px; font-size: 14px;
+      border: none; border-radius: 6px; cursor: pointer;
+      background: #e6007e; color: #fff; margin: 4px; text-decoration: none;
+    }
+    .boton:hover { opacity: 0.85; }
+    .boton.verde  { background: #84ae05; }
+    .boton.verde:hover { background: #6a8c04; opacity: 1; }
+    .boton.gris   { background: #888; }
+    .boton.gris:hover { background: #666; opacity: 1; }
+    .boton:disabled { background: #ccc; cursor: not-allowed; opacity: 1; }
+
+    /* Sección de configuración */
+    .config-box {
+      background: #fafafa; border: 1px solid #e0e0e0;
+      border-radius: 10px; padding: 20px 24px; margin-bottom: 20px;
+    }
+    .config-box h2 { color: #84ae05; margin-top: 0; font-size: 17px; }
+    .config-grid {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 14px;
+      max-width: 600px;
+    }
+    .config-grid label { font-size: 13px; color: #555; font-weight: 600; display: block; margin-bottom: 4px; }
+    .config-grid input[type="date"],
+    .config-grid input[type="time"] {
+      width: 100%; padding: 7px 10px; font-size: 13px;
+      border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box;
+    }
+    .config-grid input:focus { border-color: #e6007e; outline: none; }
+    .full-col { grid-column: 1 / -1; }
+
+    /* Reglas visuales */
+    .reglas-grid {
+      display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px;
+      margin-top: 12px;
+    }
+    .regla-card {
+      background: #fff; border: 1px solid #e0e0e0; border-radius: 8px;
+      padding: 10px 12px; font-size: 12px;
+    }
+    .regla-card .titulo { font-weight: 700; color: #84ae05; margin-bottom: 6px; font-size: 13px; }
+    .regla-card .campo { display: flex; justify-content: space-between; margin: 3px 0; }
+    .regla-card input[type="time"] {
+      width: 90px; padding: 3px 6px; font-size: 12px;
+      border: 1px solid #ccc; border-radius: 4px;
+    }
+
+    /* Tabla de preview */
+    #preview-wrap { margin-top: 20px; }
+    #preview-wrap table {
+      width: 100%; border-collapse: collapse; font-size: 13px;
+    }
+    #preview-wrap th {
+      background: #84ae05; color: #fff;
+      padding: 9px 10px; text-align: left; font-weight: 600;
+    }
+    #preview-wrap td { padding: 7px 10px; border-bottom: 1px solid #eee; }
+    #preview-wrap tr:hover td { background: #f7f0fb; }
+    .hora-original { color: #e6007e; font-weight: 600; }
+    .hora-corregida { color: #84ae05; font-weight: 600; }
+    .tipo-badge {
+      display: inline-block; font-size: 11px; padding: 2px 7px;
+      border-radius: 4px; font-weight: 600;
+    }
+    .tipo-entrada       { background: #e7f7e7; color: #167c16; }
+    .tipo-salida_lunch  { background: #fff3e0; color: #b26000; }
+    .tipo-entrada_lunch { background: #e3f2fd; color: #1565c0; }
+    .tipo-salida        { background: #fce4ec; color: #b71c1c; }
+
+    /* Mensajes */
+    #msg-estado {
+      text-align: center; font-weight: 600; font-size: 14px;
+      margin: 10px 0; min-height: 20px;
+    }
+    .sin-cambios {
+      text-align: center; padding: 30px; color: #84ae05;
+      font-size: 15px; font-weight: 600;
+    }
+
+    /* Resumen */
+    .resumen-bar {
+      display: flex; gap: 16px; flex-wrap: wrap;
+      justify-content: center; margin: 14px 0;
+    }
+    .resumen-chip {
+      padding: 6px 14px; border-radius: 20px; font-size: 13px; font-weight: 600;
+    }
+    .chip-total   { background: #f3f4f6; color: #333; }
+    .chip-entrada { background: #e7f7e7; color: #167c16; }
+    .chip-sl      { background: #fff3e0; color: #b26000; }
+    .chip-el      { background: #e3f2fd; color: #1565c0; }
+    .chip-salida  { background: #fce4ec; color: #b71c1c; }
+
+    /* Inconsistencias */
+    #incons-wrap { margin-top: 24px; }
+    #incons-wrap h3 { color: #e6007e; font-size: 15px; margin-bottom: 10px; }
+    .incons-item {
+      background: #fff5f5; border: 1px solid #ffc2c2;
+      border-radius: 6px; padding: 8px 12px; margin-bottom: 6px;
+      font-size: 13px; color: #b01919;
+    }
+    .incons-ok {
+      background: #f0fff0; border: 1px solid #bfe6bf;
+      border-radius: 6px; padding: 10px 14px; font-size: 13px;
+      color: #167c16; text-align: center; font-weight: 600;
+    }
+  </style>
+</head>
+<body>
+  <script>
+    (function() {
+      if (!sessionStorage.getItem('adminUser')) window.location.replace('admin-login.html');
+    })();
+  </script>
+
+  <div class="contenedor">
+    <img src="logo-dinex.png" alt="Logo DinEX" class="logo" style="display:block;margin:0 auto 16px;max-width:200px;">
+    <h1 style="text-align:center;color:#84ae05;">Normalizar Horarios</h1>
+    <p style="text-align:center;color:#888;font-size:13px;margin-top:-10px;margin-bottom:20px;">
+      Corrige automáticamente las horas de todos los empleados según las reglas de tu empresa.
+    </p>
+
+    <!-- ═══════════════════ CONFIGURACIÓN ═══════════════════ -->
+    <div class="config-box">
+      <h2>📅 Paso 1 — Selecciona el rango de fechas</h2>
+      <div class="config-grid">
+        <div>
+          <label>Desde:</label>
+          <input type="date" id="fechaDesde">
+        </div>
+        <div>
+          <label>Hasta:</label>
+          <input type="date" id="fechaHasta">
+        </div>
+        <div class="full-col" style="display:flex;gap:8px;flex-wrap:wrap;">
+          <button onclick="setQuincena(1)" class="boton gris" style="font-size:12px;padding:5px 12px;">
+            1ra quincena del mes
+          </button>
+          <button onclick="setQuincena(2)" class="boton gris" style="font-size:12px;padding:5px 12px;">
+            2da quincena del mes
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div class="config-box">
+      <h2>⚙️ Paso 2 — Reglas de normalización</h2>
+      <p style="font-size:12px;color:#888;margin-top:-8px;">
+        Si el empleado marcó fuera de estos límites, se ajusta automáticamente.
+      </p>
+      <div class="reglas-grid">
+        <div class="regla-card">
+          <div class="titulo">🟢 Entrada</div>
+          <div class="campo">
+            <span>Hora máxima:</span>
+            <input type="time" id="regla-entrada-max" value="09:30">
+          </div>
+          <div style="font-size:11px;color:#888;margin-top:4px;">
+            Si entró antes → se ajusta a esta hora
+          </div>
+        </div>
+        <div class="regla-card">
+          <div class="titulo">🟠 Salida a lunch</div>
+          <div class="campo">
+            <span>Hora máxima:</span>
+            <input type="time" id="regla-sl-max" value="13:00">
+          </div>
+          <div style="font-size:11px;color:#888;margin-top:4px;">
+            Si salió después → se ajusta a esta hora
+          </div>
+        </div>
+        <div class="regla-card">
+          <div class="titulo">🔵 Regreso de lunch</div>
+          <div class="campo">
+            <span>Hora mínima:</span>
+            <input type="time" id="regla-el-min" value="14:00">
+          </div>
+          <div style="font-size:11px;color:#888;margin-top:4px;">
+            Si regresó antes → se ajusta a esta hora
+          </div>
+        </div>
+        <div class="regla-card">
+          <div class="titulo">🔴 Salida final</div>
+          <div class="campo">
+            <span>Hora máxima:</span>
+            <input type="time" id="regla-salida-max" value="19:30">
+          </div>
+          <div style="font-size:11px;color:#888;margin-top:4px;">
+            Si salió después → se ajusta a esta hora
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Botones principales -->
+    <div style="text-align:center;margin-bottom:16px;">
+      <button onclick="verPreview()" class="boton" id="btn-preview">
+        🔍 Ver Vista Previa
+      </button>
+      <button onclick="aplicarCambios()" class="boton verde" id="btn-aplicar" disabled>
+        ✅ Aplicar Correcciones
+      </button>
+      <a href="admin.html" class="boton gris">Volver al Panel</a>
+    </div>
+
+    <p id="msg-estado"></p>
+
+    <!-- ═══════════════════ INCONSISTENCIAS ═══════════════════ -->
+    <div id="incons-wrap" style="display:none;"></div>
+
+    <!-- ═══════════════════ PREVIEW ═══════════════════ -->
+    <div id="preview-wrap" style="display:none;"></div>
+  </div>
+
+  <script>
+    let cambiosPendientes = [];
+
+    // ── Quincenas rápidas ─────────────────────────────────────
+    function setQuincena(n) {
+      const hoy   = new Date();
+      const anio  = hoy.getFullYear();
+      const mes   = String(hoy.getMonth() + 1).padStart(2, '0');
+      if (n === 1) {
+        document.getElementById('fechaDesde').value = `${anio}-${mes}-01`;
+        document.getElementById('fechaHasta').value = `${anio}-${mes}-15`;
+      } else {
+        const ultimo = new Date(anio, hoy.getMonth() + 1, 0).getDate();
+        document.getElementById('fechaDesde').value = `${anio}-${mes}-16`;
+        document.getElementById('fechaHasta').value = `${anio}-${mes}-${String(ultimo).padStart(2,'0')}`;
+      }
+    }
+
+    // ── Cargar quincena actual automáticamente ────────────────
+    window.addEventListener('DOMContentLoaded', () => {
+      setQuincena(new Date().getDate() <= 15 ? 1 : 2);
+    });
+
+    // ── Auth headers ──────────────────────────────────────────
+    function adminHeaders() {
+      return {
+        'Content-Type': 'application/json',
+        'x-admin-auth': JSON.stringify({
+          username: sessionStorage.getItem('adminUser') || '',
+          password: sessionStorage.getItem('adminPass') || ''
+        })
+      };
+    }
+
+    // ── Formato de fecha MM/DD/YYYY ───────────────────────────
+    function fmtFecha(f) {
+      if (!f) return '';
+      const [a, m, d] = f.split('-');
+      return `${m}/${d}/${a}`;
+    }
+
+    // ── Tipo badge ────────────────────────────────────────────
+    function tipoBadge(tipo) {
+      const clases = {
+        'entrada':       'tipo-entrada',
+        'salida_lunch':  'tipo-salida_lunch',
+        'entrada_lunch': 'tipo-entrada_lunch',
+        'salida':        'tipo-salida'
+      };
+      const textos = {
+        'entrada':       'Entrada',
+        'salida_lunch':  'Salida Lunch',
+        'entrada_lunch': 'Regreso Lunch',
+        'salida':        'Salida'
+      };
+      return `<span class="tipo-badge ${clases[tipo] || ''}">${textos[tipo] || tipo}</span>`;
+    }
+
+    // ── Obtener reglas del formulario ─────────────────────────
+    function obtenerReglas() {
+      return {
+        entrada:       { max: document.getElementById('regla-entrada-max').value },
+        salida_lunch:  { max: document.getElementById('regla-sl-max').value },
+        entrada_lunch: { min: document.getElementById('regla-el-min').value },
+        salida:        { max: document.getElementById('regla-salida-max').value }
+      };
+    }
+
+    // ── Detectar inconsistencias ──────────────────────────────
+    async function detectarInconsistencias(desde, hasta) {
+      try {
+        const res  = await fetch('/api/reporte-todos');
+        const data = await res.json();
+        const filtrados = data.filter(r => r.fecha >= desde && r.fecha <= hasta);
+
+        // Agrupar por usuario+fecha
+        const grupos = {};
+        filtrados.forEach(r => {
+          const key = `${r.usuario}||${r.fecha}`;
+          if (!grupos[key]) grupos[key] = { usuario: r.usuario, fecha: r.fecha, tipos: [] };
+          grupos[key].tipos.push(r.tipo);
+        });
+
+        // Cargar nombres
+        const nomRes = await fetch('/api/usuarios');
+        const nombres = await nomRes.json();
+
+        const problemas = [];
+        Object.values(grupos).forEach(g => {
+          const t = g.tipos;
+          const nombre = nombres[g.usuario] || g.usuario;
+          if (!t.includes('entrada'))
+            problemas.push(`${nombre} — ${fmtFecha(g.fecha)}: ❌ Falta entrada`);
+          if (!t.includes('salida'))
+            problemas.push(`${nombre} — ${fmtFecha(g.fecha)}: ❌ Falta salida`);
+          if (t.includes('salida_lunch') && !t.includes('entrada_lunch'))
+            problemas.push(`${nombre} — ${fmtFecha(g.fecha)}: ❌ Salió a lunch pero no regresó`);
+          if (!t.includes('salida_lunch') && t.includes('entrada_lunch'))
+            problemas.push(`${nombre} — ${fmtFecha(g.fecha)}: ⚠️ Regresó de lunch sin haber marcado salida a lunch`);
+        });
+
+        return problemas;
+      } catch(e) {
+        return [];
+      }
+    }
+
+    // ── Ver Preview ───────────────────────────────────────────
+    async function verPreview() {
+      const desde = document.getElementById('fechaDesde').value;
+      const hasta = document.getElementById('fechaHasta').value;
+
+      if (!desde || !hasta) {
+        setMsg('⚠️ Selecciona las fechas primero.', '#e6007e');
+        return;
+      }
+      if (desde > hasta) {
+        setMsg('⚠️ La fecha "Desde" no puede ser mayor que "Hasta".', '#e6007e');
+        return;
+      }
+
+      setMsg('⏳ Analizando registros...', '#888');
+      document.getElementById('btn-preview').disabled = true;
+      document.getElementById('btn-aplicar').disabled = true;
+      document.getElementById('preview-wrap').style.display = 'none';
+      document.getElementById('incons-wrap').style.display = 'none';
+
+      try {
+        // 1) Detectar inconsistencias
+        const problemas = await detectarInconsistencias(desde, hasta);
+        mostrarInconsistencias(problemas);
+
+        // 2) Pedir preview con reglas actuales
+        const reglas = obtenerReglas();
+        const res  = await fetch('/api/normalizar-preview', {
+          method: 'POST',
+          headers: adminHeaders(),
+          body: JSON.stringify({ desde, hasta, reglas })
+        });
+        const data = await res.json();
+
+        if (!data.success) {
+          setMsg('❌ Error: ' + (data.mensaje || 'Error desconocido'), '#e6007e');
+          document.getElementById('btn-preview').disabled = false;
+          return;
+        }
+
+        cambiosPendientes = data.cambios;
+        mostrarPreview(data.cambios, desde, hasta);
+
+        if (data.cambios.length > 0) {
+          document.getElementById('btn-aplicar').disabled = false;
+          setMsg(`✅ Se encontraron <strong>${data.cambios.length}</strong> registros para corregir. Revisa la tabla y haz clic en "Aplicar Correcciones".`, '#84ae05');
+        } else {
+          setMsg('✅ ¡Todos los registros ya están dentro de las reglas! No hay nada que corregir.', '#84ae05');
+        }
+
+      } catch(e) {
+        setMsg('❌ Error de conexión con el servidor.', '#e6007e');
+        console.error(e);
+      }
+
+      document.getElementById('btn-preview').disabled = false;
+    }
+
+    // ── Mostrar inconsistencias ───────────────────────────────
+    function mostrarInconsistencias(problemas) {
+      const wrap = document.getElementById('incons-wrap');
+      wrap.style.display = 'block';
+      if (!problemas.length) {
+        wrap.innerHTML = '<div class="incons-ok">✔ No se detectaron inconsistencias en los registros del período seleccionado.</div>';
+        return;
+      }
+      let html = `<h3>⚠️ Inconsistencias detectadas (${problemas.length})</h3>`;
+      problemas.forEach(p => {
+        html += `<div class="incons-item">${p}</div>`;
+      });
+      wrap.innerHTML = html;
+    }
+
+    // ── Mostrar tabla de preview ──────────────────────────────
+    function mostrarPreview(cambios, desde, hasta) {
+      const wrap = document.getElementById('preview-wrap');
+      wrap.style.display = 'block';
+
+      if (!cambios.length) {
+        wrap.innerHTML = '<div class="sin-cambios">✅ Todos los horarios están dentro de las reglas. No hay correcciones necesarias.</div>';
+        return;
+      }
+
+      // Contadores por tipo
+      const cnt = { entrada: 0, salida_lunch: 0, entrada_lunch: 0, salida: 0 };
+      cambios.forEach(c => { if (cnt[c.tipo] !== undefined) cnt[c.tipo]++; });
+
+      let html = `
+        <h3 style="color:#84ae05;margin-bottom:8px;">
+          📋 Vista Previa — ${cambios.length} correcciones (${fmtFecha(desde)} al ${fmtFecha(hasta)})
+        </h3>
+        <div class="resumen-bar">
+          <span class="resumen-chip chip-total">Total: ${cambios.length}</span>
+          ${cnt.entrada       ? `<span class="resumen-chip chip-entrada">Entradas: ${cnt.entrada}</span>` : ''}
+          ${cnt.salida_lunch  ? `<span class="resumen-chip chip-sl">Salida Lunch: ${cnt.salida_lunch}</span>` : ''}
+          ${cnt.entrada_lunch ? `<span class="resumen-chip chip-el">Regreso Lunch: ${cnt.entrada_lunch}</span>` : ''}
+          ${cnt.salida        ? `<span class="resumen-chip chip-salida">Salidas: ${cnt.salida}</span>` : ''}
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>Empleado</th>
+              <th>Fecha</th>
+              <th>Tipo</th>
+              <th>Hora Original</th>
+              <th>Hora Corregida</th>
+            </tr>
+          </thead>
+          <tbody>
+      `;
+
+      cambios.forEach(c => {
+        html += `
+          <tr>
+            <td><strong>${c.nombre}</strong></td>
+            <td>${fmtFecha(c.fecha)}</td>
+            <td>${tipoBadge(c.tipo)}</td>
+            <td class="hora-original">${(c.horaOriginal || '').slice(0,5)}</td>
+            <td class="hora-corregida">${(c.horaCorregida || '').slice(0,5)}</td>
+          </tr>
+        `;
+      });
+
+      html += '</tbody></table>';
+      wrap.innerHTML = html;
+    }
+
+    // ── Aplicar cambios ───────────────────────────────────────
+    async function aplicarCambios() {
+      if (!cambiosPendientes.length) {
+        setMsg('No hay cambios pendientes.', '#888');
+        return;
+      }
+      if (!confirm(`¿Confirmas aplicar ${cambiosPendientes.length} correcciones?\n\nEsta acción actualizará los registros en la base de datos.`)) return;
+
+      setMsg('⏳ Aplicando correcciones...', '#888');
+      document.getElementById('btn-aplicar').disabled = true;
+      document.getElementById('btn-preview').disabled = true;
+
+      try {
+        const res = await fetch('/api/normalizar-aplicar', {
+          method: 'POST',
+          headers: adminHeaders(),
+          body: JSON.stringify({ cambios: cambiosPendientes })
+        });
+        const data = await res.json();
+
+        if (data.success) {
+          setMsg(`✅ ¡Listo! Se aplicaron <strong>${data.completados}</strong> correcciones correctamente.${data.errores ? ` (${data.errores} errores)` : ''}`, '#84ae05');
+          cambiosPendientes = [];
+          // Limpiar la tabla de preview
+          document.getElementById('preview-wrap').innerHTML =
+            '<div class="sin-cambios">✅ Correcciones aplicadas exitosamente.</div>';
+        } else {
+          setMsg('❌ Error al aplicar: ' + (data.mensaje || 'Error desconocido'), '#e6007e');
+          document.getElementById('btn-aplicar').disabled = false;
+        }
+      } catch(e) {
+        setMsg('❌ Error de conexión con el servidor.', '#e6007e');
+        document.getElementById('btn-aplicar').disabled = false;
+        console.error(e);
+      }
+
+      document.getElementById('btn-preview').disabled = false;
+    }
+
+    function setMsg(txt, color) {
+      const el = document.getElementById('msg-estado');
+      el.style.color = color || '#333';
+      el.innerHTML = txt;
+    }
+  </script>
+  <script src="common.js"></script>
+</body>
+</html>

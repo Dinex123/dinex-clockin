@@ -529,8 +529,26 @@ app.post('/api/marcar', (req, res) => {
               } catch (e) { console.warn('Backup JSON no-crítico falló:', e.message); }
 
               const suffix = (!MODO_ESTRICTO && !gf.inside) ? ' (fuera de geocerca)' : '';
+
+              // ── Avisos de puntualidad (solo informativos, el marcaje ya se guardó) ──
+              let avisoTardanza = '';
+              const horaHHMM = hora.slice(0, 5); // HH:MM
+              if (tipo === 'entrada' && horaHHMM > '09:35') {
+                // Calcular minutos de tardanza
+                const [hE, mE] = horaHHMM.split(':').map(Number);
+                const minsTardanza = (hE * 60 + mE) - (9 * 60 + 35);
+                avisoTardanza = ` ⚠️ Llegaste ${minsTardanza} minuto${minsTardanza !== 1 ? 's' : ''} tarde (hora límite: 9:35 AM).`;
+              }
+              if (tipo === 'entrada_lunch' && horaHHMM > '14:05') {
+                // Calcular minutos extra de lunch
+                const [hL, mL] = horaHHMM.split(':').map(Number);
+                const minsExtra = (hL * 60 + mL) - (14 * 60 + 5);
+                avisoTardanza = ` ⚠️ Regresaste ${minsExtra} minuto${minsExtra !== 1 ? 's' : ''} tarde del lunch (hora límite: 2:05 PM).`;
+              }
+
               const mensajeFinal = (advertencia ? advertencia + ' ' : '') +
-                                   `Marcaje de ${tipo} registrado a las ${hora}.`;
+                                   `Marcaje de ${tipo} registrado a las ${hora}.` +
+                                   avisoTardanza;
               res.json({
                 success: true,
                 mensaje: mensajeFinal + suffix,
@@ -1022,6 +1040,105 @@ app.delete('/api/eliminar-supervisor', verificarAdmin, (req, res) => {
     writeJsonSafe(PATHS.supervisors, supervisors);
     res.json({ success: true });
   } catch (e) { res.status(500).json({ success: false }); }
+});
+
+
+// ==== NORMALIZACIÓN AUTOMÁTICA DE HORARIOS ====
+// Endpoint de VISTA PREVIA — NO guarda nada, solo muestra qué cambiaría
+app.post('/api/normalizar-preview', verificarAdmin, (req, res) => {
+  try {
+    const { desde, hasta } = req.body || {};
+    if (!desde || !hasta) return res.json({ success: false, mensaje: 'Faltan fechas.' });
+
+    const users = readJsonSafe(PATHS.users, []);
+    const activos = users
+      .filter(u => u.activo !== false && u.estado !== 'Eliminado' && u.estado !== 'Inactivo')
+      .map(u => ({ usuario: u.usuario, nombre: u.nombre || u.usuario }));
+
+    if (!activos.length) return res.json({ success: true, cambios: [] });
+
+    const ids = activos.map(u => u.usuario);
+    const nameMap = {};
+    activos.forEach(u => { nameMap[u.usuario] = u.nombre; });
+    const placeholders = ids.map(() => '?').join(',');
+
+    db.all(
+      `SELECT id, usuario, tipo, fecha, hora FROM registros
+       WHERE usuario IN (${placeholders}) AND fecha >= ? AND fecha <= ?
+       ORDER BY usuario, fecha, hora`,
+      [...ids, desde, hasta],
+      (err, rows) => {
+        if (err) return res.status(500).json({ success: false, mensaje: 'Error leyendo DB.' });
+
+        // Reglas de normalización
+        const REGLAS = {
+          entrada:       { min: null, max: '09:30' }, // si entra antes de 9:30 → 9:30
+          salida_lunch:  { min: null, max: '13:00' }, // si sale a lunch después de 1pm → 1pm
+          entrada_lunch: { min: '14:00', max: null }, // si regresa antes de 2pm → 2pm
+          salida:        { min: null, max: '19:30' }  // si sale después de 7:30pm → 7:30pm
+        };
+
+        const cambios = [];
+        rows.forEach(r => {
+          const regla = REGLAS[r.tipo];
+          if (!regla) return;
+          const horaLimpia = (r.hora || '').slice(0, 5); // HH:MM
+          let horaCorregida = horaLimpia;
+
+          if (regla.max && horaLimpia > regla.max) horaCorregida = regla.max;
+          if (regla.min && horaLimpia < regla.min) horaCorregida = regla.min;
+
+          if (horaCorregida !== horaLimpia) {
+            cambios.push({
+              id:             r.id,
+              usuario:        r.usuario,
+              nombre:         nameMap[r.usuario] || r.usuario,
+              fecha:          r.fecha,
+              tipo:           r.tipo,
+              horaOriginal:   r.hora,
+              horaCorregida:  horaCorregida + ':00'
+            });
+          }
+        });
+
+        res.json({ success: true, cambios });
+      }
+    );
+  } catch (e) {
+    console.error('POST /api/normalizar-preview error:', e);
+    res.status(500).json({ success: false, mensaje: 'Error interno.' });
+  }
+});
+
+// Endpoint de APLICAR — guarda los cambios confirmados
+app.post('/api/normalizar-aplicar', verificarAdmin, (req, res) => {
+  try {
+    const { cambios } = req.body || {};
+    if (!cambios || !cambios.length) return res.json({ success: false, mensaje: 'No hay cambios.' });
+
+    let completados = 0;
+    let errores = 0;
+
+    const aplicarSiguiente = (i) => {
+      if (i >= cambios.length) {
+        return res.json({ success: true, completados, errores });
+      }
+      const c = cambios[i];
+      db.run(
+        `UPDATE registros SET hora = ? WHERE id = ?`,
+        [c.horaCorregida, c.id],
+        (err) => {
+          if (err) { errores++; console.error('normalizar-aplicar:', err.message); }
+          else completados++;
+          aplicarSiguiente(i + 1);
+        }
+      );
+    };
+    aplicarSiguiente(0);
+  } catch (e) {
+    console.error('POST /api/normalizar-aplicar error:', e);
+    res.status(500).json({ success: false, mensaje: 'Error interno.' });
+  }
 });
 
 // ==== Manejador global de errores ====
