@@ -1135,11 +1135,20 @@ app.delete('/api/eliminar-supervisor', verificarAdmin, (req, res) => {
 
 
 // ==== NORMALIZACIÓN AUTOMÁTICA DE HORARIOS ====
-// Endpoint de VISTA PREVIA — NO guarda nada, solo muestra qué cambiaría
+// Lógica: establece horas EXACTAS para todos los registros del rango
+// Sin importar si el empleado llegó antes o después — siempre queda la hora configurada
 app.post('/api/normalizar-preview', verificarAdmin, (req, res) => {
   try {
     const { desde, hasta } = req.body || {};
     if (!desde || !hasta) return res.json({ success: false, mensaje: 'Faltan fechas.' });
+
+    // Horas exactas configuradas por el admin en el frontend
+    const horasFijas = (req.body && req.body.horasFijas) || {
+      entrada:       '09:30:00',
+      salida_lunch:  '13:00:00',
+      entrada_lunch: '14:00:00',
+      salida:        '19:30:00'
+    };
 
     const users = readJsonSafe(PATHS.users, []);
     const activos = users
@@ -1161,47 +1170,25 @@ app.post('/api/normalizar-preview', verificarAdmin, (req, res) => {
       (err, rows) => {
         if (err) return res.status(500).json({ success: false, mensaje: 'Error leyendo DB.' });
 
-        // Reglas de normalización — ahora con min Y max para entrada
-        // El frontend envía las reglas configuradas por el admin
-        const reglasBody = (req.body && req.body.reglas) || {};
-        const REGLAS = {
-          entrada: {
-            min: (reglasBody.entrada && reglasBody.entrada.min) || null, // si entró antes → ajustar
-            max: (reglasBody.entrada && reglasBody.entrada.max) || '09:30' // si entró después → ajustar
-          },
-          salida_lunch: {
-            min: null,
-            max: (reglasBody.salida_lunch && reglasBody.salida_lunch.max) || '13:00'
-          },
-          entrada_lunch: {
-            min: (reglasBody.entrada_lunch && reglasBody.entrada_lunch.min) || '14:00',
-            max: null
-          },
-          salida: {
-            min: null,
-            max: (reglasBody.salida && reglasBody.salida.max) || '19:30'
-          }
-        };
-
         const cambios = [];
         rows.forEach(r => {
-          const regla = REGLAS[r.tipo];
-          if (!regla) return;
-          const horaLimpia = (r.hora || '').slice(0, 5); // HH:MM
-          let horaCorregida = horaLimpia;
+          // Solo procesar los 4 tipos de marcaje estándar
+          const horaFija = horasFijas[r.tipo];
+          if (!horaFija) return;
 
-          if (regla.max && horaLimpia > regla.max) horaCorregida = regla.max;
-          if (regla.min && horaLimpia < regla.min) horaCorregida = regla.min;
+          const horaActual = (r.hora || '').slice(0, 8); // HH:MM:SS
+          const horaObjetivo = horaFija.length === 5 ? horaFija + ':00' : horaFija;
 
-          if (horaCorregida !== horaLimpia) {
+          // Siempre corregir — sin importar si ya está bien o no
+          if (horaActual !== horaObjetivo) {
             cambios.push({
-              id:             r.id,
-              usuario:        r.usuario,
-              nombre:         nameMap[r.usuario] || r.usuario,
-              fecha:          r.fecha,
-              tipo:           r.tipo,
-              horaOriginal:   r.hora,
-              horaCorregida:  horaCorregida + ':00'
+              id:            r.id,
+              usuario:       r.usuario,
+              nombre:        nameMap[r.usuario] || r.usuario,
+              fecha:         r.fecha,
+              tipo:          r.tipo,
+              horaOriginal:  r.hora,
+              horaCorregida: horaObjetivo
             });
           }
         });
