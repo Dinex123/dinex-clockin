@@ -969,6 +969,7 @@ app.post('/api/corregir-hora', verificarAdmin, (req, res) => {
 });
 
 // ==== [FIX C-3] agregar-marcaje ahora requiere verificarAdmin ====
+// ==== [FIX C-4] Validación anti-duplicado en agregar-marcaje manual ====
 app.post('/api/agregar-marcaje', verificarAdmin, (req, res) => {
   try {
     const { usuario, departamento, tipo, fecha, hora } = req.body || {};
@@ -977,18 +978,33 @@ app.post('/api/agregar-marcaje', verificarAdmin, (req, res) => {
     }
     const ip = getRealIp(req);
 
-    db.run(
-      `INSERT INTO registros (usuario, tipo, fecha, hora, ip, departamento) VALUES (?, ?, ?, ?, ?, ?)`,
-      [usuario, tipo, fecha, hora, ip, departamento],
-      (err) => {
-        if (err) {
-          console.error('SQLite insertar manual:', err.message);
-          return res.json({ success: false, mensaje: 'Error al guardar en la base de datos.' });
+    // Verificar si ya existe ese tipo de marcaje para ese usuario y fecha
+    db.get(
+      `SELECT id FROM registros WHERE usuario = ? AND tipo = ? AND fecha = ?`,
+      [usuario, tipo, fecha],
+      (errCheck, existing) => {
+        if (errCheck) {
+          console.error('SQLite check duplicado:', errCheck.message);
+          return res.status(500).json({ success: false, mensaje: 'Error interno al verificar duplicados.' });
         }
-        const all = readJsonSafe(PATHS.marcajes, []);
-        all.push({ usuario, departamento, tipo, fecha, hora, ip });
-        writeJsonSafe(PATHS.marcajes, all);
-        res.json({ success: true, mensaje: 'Registro agregado correctamente.' });
+        if (existing) {
+          return res.json({ success: false, mensaje: `Ya existe un registro de "${tipo}" para ${usuario} el ${fecha}.` });
+        }
+
+        db.run(
+          `INSERT INTO registros (usuario, tipo, fecha, hora, ip, departamento) VALUES (?, ?, ?, ?, ?, ?)`,
+          [usuario, tipo, fecha, hora, ip, departamento],
+          (err) => {
+            if (err) {
+              console.error('SQLite insertar manual:', err.message);
+              return res.json({ success: false, mensaje: 'Error al guardar en la base de datos.' });
+            }
+            const all = readJsonSafe(PATHS.marcajes, []);
+            all.push({ usuario, departamento, tipo, fecha, hora, ip });
+            writeJsonSafe(PATHS.marcajes, all);
+            res.json({ success: true, mensaje: 'Registro agregado correctamente.' });
+          }
+        );
       }
     );
   } catch (e) {
