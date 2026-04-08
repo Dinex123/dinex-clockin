@@ -234,6 +234,39 @@ function loginRateLimit(req, res, next) {
   next();
 }
 
+// ==== [FIX A-5] Rate limiting para endpoints públicos (lectura) ====
+// 60 requests por minuto por IP — más que suficiente para uso normal
+// Protege contra scraping masivo y ataques de enumeración
+const _apiRequests = new Map();
+function apiRateLimit(req, res, next) {
+  const ip  = getRealIp(req);
+  const now = Date.now();
+  const entry = _apiRequests.get(ip) || { count: 0, resetAt: now + 60 * 1000 };
+  if (now > entry.resetAt) { entry.count = 0; entry.resetAt = now + 60 * 1000; }
+  entry.count++;
+  _apiRequests.set(ip, entry);
+  if (entry.count > 60) {
+    return res.status(429).json({ success: false, mensaje: 'Demasiadas solicitudes. Espera un momento.' });
+  }
+  next();
+}
+
+// ==== [FIX A-6] Rate limiting para marcaje por IP ====
+// Máx 20 marcajes por minuto por IP — evita ataques de marcaje masivo
+const _marcarRequests = new Map();
+function marcarRateLimit(req, res, next) {
+  const ip  = getRealIp(req);
+  const now = Date.now();
+  const entry = _marcarRequests.get(ip) || { count: 0, resetAt: now + 60 * 1000 };
+  if (now > entry.resetAt) { entry.count = 0; entry.resetAt = now + 60 * 1000; }
+  entry.count++;
+  _marcarRequests.set(ip, entry);
+  if (entry.count > 20) {
+    return res.status(429).json({ success: false, mensaje: 'Demasiados intentos de marcaje. Espera un momento.' });
+  }
+  next();
+}
+
 // ==== Endpoint para IDs de empleados (usado en dona del admin) ====
 app.get('/api/empleados-ids', (req, res) => {
   try {
@@ -280,12 +313,70 @@ function ejecutarBackup() {
 
 cron.schedule('0 23 * * *', ejecutarBackup, { timezone: 'America/Chicago' });
 
+// ==== [FIX B-5] Backup adicional los domingos a las 11PM ====
+// Doble protección semanal — copia a subcarpeta /backups/semanal
+cron.schedule('0 23 * * 0', () => {
+  const fecha  = moment().tz('America/Chicago').format('YYYY-MM-DD');
+  const semDir = path.join(PATHS.backupsDir, 'semanal');
+  try {
+    if (!fs.existsSync(semDir)) fs.mkdirSync(semDir, { recursive: true });
+    const archivos = [
+      { src: PATHS.dbFile,      dst: path.join(semDir, `dev-semanal-${fecha}.db`)      },
+      { src: PATHS.users,       dst: path.join(semDir, `users-semanal-${fecha}.json`)   },
+      { src: PATHS.admins,      dst: path.join(semDir, `admins-semanal-${fecha}.json`)  },
+      { src: PATHS.supervisors, dst: path.join(semDir, `supervisors-semanal-${fecha}.json`) },
+      { src: PATHS.marcajes,    dst: path.join(semDir, `marcajes-semanal-${fecha}.json`) },
+    ];
+    archivos.forEach(({ src, dst }) => {
+      try { if (fs.existsSync(src)) fse.copySync(src, dst); }
+      catch (e) { console.error(`[Backup Semanal] Error: ${src}`, e.message); }
+    });
+    // Conservar solo últimas 8 semanas
+    const limite = moment().tz('America/Chicago').subtract(56, 'days');
+    fs.readdirSync(semDir).forEach(f => {
+      const match = f.match(/-(\d{4}-\d{2}-\d{2})\./);
+      if (match && moment(match[1]).isBefore(limite)) {
+        fs.unlinkSync(path.join(semDir, f));
+      }
+    });
+    console.log(`[Backup Semanal] ${fecha} completado OK`);
+  } catch(e) { console.error('[Backup Semanal] Error crítico:', e.message); }
+}, { timezone: 'America/Chicago' });
+
 app.get('/api/backup-now', verificarAdmin, (req, res) => {
   const errores = ejecutarBackup();
+  const fecha   = moment().tz('America/Chicago').format('YYYY-MM-DD HH:mm:ss');
   if (errores.length === 0) {
-    res.json({ success: true, mensaje: 'Backup completo creado correctamente.' });
+    res.json({ success: true, mensaje: `Backup completo creado el ${fecha}.`, fecha });
   } else {
     res.status(500).json({ success: false, mensaje: `Backup parcial. Errores en: ${errores.join(', ')}` });
+  }
+});
+
+// ==== [FIX B-6] Endpoint para verificar estado del último backup ====
+app.get('/api/backup-status', verificarAdmin, (req, res) => {
+  try {
+    if (!fs.existsSync(PATHS.backupsDir)) {
+      return res.json({ success: false, mensaje: 'Carpeta de backups no encontrada.' });
+    }
+    const archivos = fs.readdirSync(PATHS.backupsDir)
+      .filter(f => f.endsWith('.db') || f.endsWith('.json'))
+      .map(f => {
+        const full  = path.join(PATHS.backupsDir, f);
+        const stats = fs.statSync(full);
+        return { nombre: f, fecha: stats.mtime, tamanio: stats.size };
+      })
+      .sort((a, b) => b.fecha - a.fecha);
+    const ultimo = archivos[0];
+    res.json({
+      success:      true,
+      totalArchivos: archivos.length,
+      ultimoBackup:  ultimo ? moment(ultimo.fecha).tz('America/Chicago').format('MM/DD/YYYY HH:mm') : 'Ninguno',
+      archivos:      archivos.slice(0, 10)
+    });
+  } catch(e) {
+    console.error('GET /api/backup-status error:', e);
+    res.status(500).json({ success: false, mensaje: 'Error verificando backups.' });
   }
 });
 
@@ -397,7 +488,7 @@ function rateLimitMarcaje(usuario) {
 
 // ==== Marcaje ====
 // 100% SQLite — el JSON solo se mantiene como backup secundario
-app.post('/api/marcar', (req, res) => {
+app.post('/api/marcar', marcarRateLimit, (req, res) => {
   try {
     const now       = moment().tz('America/Chicago');
     const fechaHoy  = now.format('YYYY-MM-DD');
@@ -592,7 +683,7 @@ app.post('/api/marcar', (req, res) => {
 });
 
 // ==== Reportes ====
-app.get('/api/reporte', (req, res) => {
+app.get('/api/reporte', apiRateLimit, (req, res) => {
   try {
     const usuario = req.query.usuario;
     if (!usuario) return res.json([]);
@@ -616,7 +707,7 @@ app.get('/api/reporte', (req, res) => {
   }
 });
 
-app.get('/api/empleados', (req, res) => {
+app.get('/api/empleados', apiRateLimit, (req, res) => {
   try {
     const users = readJsonSafe(PATHS.users, []);
     res.json(users.filter(u => u.activo !== false));
@@ -626,7 +717,7 @@ app.get('/api/empleados', (req, res) => {
   }
 });
 
-app.get('/api/usuarios', (req, res) => {
+app.get('/api/usuarios', apiRateLimit, (req, res) => {
   try {
     const users = readJsonSafe(PATHS.users, []);
     // Incluye todos los usuarios (activos e inactivos) para resolución de nombres en reportes
@@ -639,7 +730,7 @@ app.get('/api/usuarios', (req, res) => {
   }
 });
 
-app.get('/api/usuarios-detalle', (req, res) => {
+app.get('/api/usuarios-detalle', apiRateLimit, (req, res) => {
   try {
     const users = readJsonSafe(PATHS.users, []);
     const detalle = users.map(u => ({
@@ -655,7 +746,7 @@ app.get('/api/usuarios-detalle', (req, res) => {
   }
 });
 
-app.get('/api/reporte-todos', (req, res) => {
+app.get('/api/reporte-todos', apiRateLimit, (req, res) => {
   try {
     const users = readJsonSafe(PATHS.users, []);
     const activos = users
@@ -901,7 +992,7 @@ app.post('/api/agregar-marcaje', verificarAdmin, (req, res) => {
 });
 
 // ==== Dashboard resumen estado hoy ====
-app.get('/api/resumen-estado-hoy', (req, res) => {
+app.get('/api/resumen-estado-hoy', apiRateLimit, (req, res) => {
   try {
     const usuarios = readJsonSafe(PATHS.users, []);
     const activosUsers = usuarios.filter(u => u.activo !== false);
