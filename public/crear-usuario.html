@@ -176,7 +176,13 @@
       try {
         const res = await fetch('/api/crear-usuario', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            'x-admin-auth': JSON.stringify({
+              username: sessionStorage.getItem('adminUser') || '',
+              password: sessionStorage.getItem('adminPass') || ''
+            })
+          },
           body: JSON.stringify({ nombre, usuario, contrasena, departamento, fecha_creacion: new Date().toISOString() })
         });
         const result = await res.json();
