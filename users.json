@@ -1,1 +1,12 @@
-[]
+[
+  {
+    "nombre": "Jose Antonio Chirino",
+    "usuario": "chiri",
+    "contrasena": "$2b$10$Ln1J8TM.hC8avyk2pfRRXOTo11TNfn2WCa3FZqeX.K3p2a7an.oha",
+    "departamento": "Corporativo",
+    "activo": true,
+    "estado": "Activo",
+    "fecha_creacion": "2026-04-12T05:25:39.594Z",
+    "fecha_baja": null
+  }
+]

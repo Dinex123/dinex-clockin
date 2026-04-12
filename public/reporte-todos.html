@@ -8,83 +8,156 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
   <style>
-    .boton.danger {
-      background: #ea1902;
-    }
+    .contenedor { max-width: 1200px; margin: 0 auto; padding: 20px; }
+    .logo { display: block; margin: 0 auto 10px auto; max-width: 220px; }
+    h1 { text-align: center; margin-bottom: 16px; color: #84ae05; }
 
-    table {
-      width: 90%;
-      margin: 20px auto;
-      border-collapse: collapse;
-      font-size: 14px;
-      text-align: center;
-      box-shadow: 0 0 5px rgba(0,0,0,0.1);
-    }
-
-    th {
-      background-color: #0a75c2;
-      color: white;
-      padding: 10px;
-      font-weight: bold;
-    }
-
-    td {
-      padding: 8px;
-    }
-
-    tr:nth-child(even) {
-      background-color: #f8f8f8;
-    }
-
-    tr:hover {
-      background-color: #eef6ff;
-    }
-
-    h1 {
-      text-align: center;
-      margin-bottom: 10px;
-    }
-
-    .botones {
-      text-align: center;
-      margin: 20px 0;
-    }
-
+    /* ── Botones ── */
     .boton {
-      background-color: #ec008c;
-      color: white;
-      border: none;
-      padding: 8px 16px;
-      margin: 5px;
-      border-radius: 5px;
-      cursor: pointer;
-      transition: background 0.3s ease;
+      background-color: #ec008c; color: white; border: none;
+      padding: 9px 18px; margin: 4px; border-radius: 6px;
+      cursor: pointer; font-size: 14px; text-decoration: none;
+      display: inline-block; transition: background .2s;
+    }
+    .boton:hover { background-color: #c60074; }
+    .boton.verde { background-color: #84ae05; }
+    .boton.verde:hover { background-color: #6a8c04; }
+    .boton.gris { background-color: #888; }
+    .boton.gris:hover { background-color: #666; }
+    .boton.pequeño { padding: 5px 12px; font-size: 12px; margin: 2px; }
+
+    /* ── Selector de quincena ── */
+    .quincena-wrap {
+      display: flex; justify-content: center; align-items: center;
+      gap: 8px; flex-wrap: wrap; margin: 12px 0;
+      padding: 12px 16px; background: #fafafa;
+      border: 1px solid #e8e8e8; border-radius: 8px;
+    }
+    .quincena-wrap label { font-size: 13px; color: #555; font-weight: 600; }
+    .quincena-wrap input[type="date"] {
+      padding: 6px 10px; font-size: 13px;
+      border: 1px solid #ccc; border-radius: 6px; color: #333;
+    }
+    .quincena-wrap input[type="date"]:focus { border-color: #ec008c; outline: none; }
+    .quincena-wrap .sep { font-size: 13px; color: #888; }
+    #info-quincena {
+      text-align: center; font-size: 12px; color: #84ae05;
+      font-weight: 600; margin: 4px 0 10px; min-height: 16px;
     }
 
-    .boton:hover {
-      background-color: #c60074;
+    /* ── Filtro departamento ── */
+    .filtro-wrap {
+      display: flex; justify-content: center; align-items: center;
+      gap: 10px; flex-wrap: wrap; margin: 8px 0 14px;
+    }
+    .filtro-wrap label { font-size: 13px; color: #555; font-weight: 600; }
+    .filtro-wrap select, .filtro-wrap input[type="text"] {
+      padding: 6px 10px; font-size: 13px;
+      border: 1px solid #ccc; border-radius: 6px; color: #333;
+    }
+    .filtro-wrap select:focus,
+    .filtro-wrap input[type="text"]:focus { border-color: #ec008c; outline: none; }
+
+    /* ── Tarjetas de resumen global ── */
+    .cards-resumen {
+      display: flex; gap: 10px; flex-wrap: wrap;
+      justify-content: center; margin: 14px 0;
+    }
+    .card-stat {
+      background: #fff; border: 1px solid #e8e8e8; border-radius: 8px;
+      padding: 12px 20px; text-align: center; min-width: 130px;
+      box-shadow: 0 1px 4px rgba(0,0,0,.06);
+    }
+    .card-stat .numero {
+      font-size: 28px; font-weight: bold; line-height: 1.1;
+    }
+    .card-stat .etiqueta { font-size: 12px; color: #777; margin-top: 3px; }
+    .card-stat.verde .numero { color: #84ae05; }
+    .card-stat.rojo  .numero { color: #c0392b; }
+    .card-stat.naranja .numero { color: #e67e22; }
+    .card-stat.azul  .numero { color: #0a75c2; }
+
+    /* ── Tabla principal ── */
+    .tabla-resumen {
+      width: 100%; border-collapse: collapse;
+      font-size: 13px; margin-top: 10px;
+      box-shadow: 0 0 6px rgba(0,0,0,.08);
+    }
+    .tabla-resumen th {
+      background: #ec008c; color: white;
+      padding: 10px 8px; font-weight: bold;
+      text-align: center; white-space: nowrap;
+    }
+    .tabla-resumen td {
+      padding: 9px 8px; border-bottom: 1px solid #eee;
+      text-align: center; vertical-align: middle;
+    }
+    .tabla-resumen tbody tr:hover td { background: #fef0f8; cursor: pointer; }
+
+    /* ── Semáforo ── */
+    .semaforo {
+      display: inline-block; width: 14px; height: 14px;
+      border-radius: 50%; margin-right: 6px;
+      vertical-align: middle; flex-shrink: 0;
+    }
+    .sem-verde  { background: #27ae60; }
+    .sem-amarillo { background: #f39c12; }
+    .sem-rojo   { background: #c0392b; }
+
+    /* ── Badges de alerta ── */
+    .badge {
+      display: inline-block; font-size: 10px; padding: 2px 7px;
+      border-radius: 4px; font-weight: 600; margin: 2px; white-space: nowrap;
+    }
+    .badge-ok     { background: #e7f7e7; color: #167c16; }
+    .badge-warn   { background: #fff3e0; color: #b45309; }
+    .badge-error  { background: #ffe6e6; color: #b01919; }
+    .badge-auto   { background: #fff0d0; color: #7c4a00; }
+    .badge-geo    { background: #ffe0f0; color: #8b0050; }
+
+    /* ── Colores de fila ── */
+    .fila-ok      { background: #ffffff; }
+    .fila-warn    { background: #fffbf0; }
+    .fila-error   { background: #fff5f5; }
+
+    /* ── Nombre con semáforo ── */
+    .nombre-celda {
+      display: flex; align-items: center;
+      justify-content: flex-start; gap: 6px;
+      text-align: left; padding-left: 8px;
     }
 
-    label {
-      margin: 0 10px;
+    /* ── Horas formateadas ── */
+    .horas-txt { font-weight: bold; color: #333; }
+
+    /* ── Leyenda ── */
+    .leyenda {
+      display: flex; gap: 16px; flex-wrap: wrap;
+      justify-content: center; margin: 10px 0 4px;
+      font-size: 12px; color: #555;
+    }
+    .leyenda-item { display: flex; align-items: center; gap: 5px; }
+
+    /* ── Mensaje cargando ── */
+    #mensaje-carga {
+      text-align: center; font-size: 14px; color: #888;
+      margin: 20px 0; font-style: italic;
     }
 
-    .contenedor {
-      max-width: 1100px;
-      margin: auto;
-      padding: 20px;
-    }
+    /* ── Ordenar ── */
+    .tabla-resumen th.ordenable { cursor: pointer; user-select: none; }
+    .tabla-resumen th.ordenable:hover { background: #c60074; }
+    .sort-icon { font-size: 10px; margin-left: 4px; }
 
-    .logo {
-      display: block;
-      margin: 0 auto 10px auto;
-      max-width: 220px;
+    @media print {
+      .no-print { display: none !important; }
+      .tabla-resumen { font-size: 11px; }
     }
   </style>
 </head>
 <body>
+
   <script>
-    // Guard de sesión admin - redirige si no hay credenciales
     (function() {
       if (!sessionStorage.getItem('adminUser')) {
         window.location.replace('admin-login.html');
@@ -96,192 +169,527 @@
     <img src="logo-dinex.png" alt="Logo DinEX" class="logo">
     <h1>Resumen por Empleado</h1>
 
-    <div style="text-align:center; margin: 20px 0;">
-      <label>Desde: <input type="date" id="fechaInicio"></label>
-      <label>Hasta: <input type="date" id="fechaFin"></label>
-      <button class="boton" onclick="filtrarPorFecha()">Buscar por Fechas</button>
+    <!-- ── Selector de quincena ── -->
+    <div class="quincena-wrap no-print">
+      <label>📅 Desde:</label>
+      <input type="date" id="fechaDesde">
+      <span class="sep">→</span>
+      <label>Hasta:</label>
+      <input type="date" id="fechaHasta">
+      <button onclick="aplicarFiltro()" class="boton" style="font-size:13px;padding:6px 14px;">Filtrar</button>
+      <button onclick="quincenaAnterior()" class="boton gris" style="font-size:12px;padding:6px 12px;">◀ Anterior</button>
+      <button onclick="quincenaSiguiente()" class="boton gris" style="font-size:12px;padding:6px 12px;">Siguiente ▶</button>
     </div>
+    <div id="info-quincena"></div>
 
-    <div style="text-align:center; margin: 10px 0;">
+    <!-- ── Filtros de departamento y búsqueda ── -->
+    <div class="filtro-wrap no-print">
       <label>Departamento:
-        <select id="departamento" onchange="filtrarPorDepartamento()">
+        <select id="filtroDept" onchange="renderTabla()">
           <option value="todos">Todos</option>
+        </select>
+      </label>
+      <label>Buscar:
+        <input type="text" id="filtroBusca" placeholder="Nombre o usuario..."
+          oninput="renderTabla()" style="width:200px;">
+      </label>
+      <label>Ordenar por:
+        <select id="filtroOrden" onchange="renderTabla()">
+          <option value="nombre">Nombre</option>
+          <option value="horas_desc">Más horas primero</option>
+          <option value="horas_asc">Menos horas primero</option>
+          <option value="errores">Con más errores primero</option>
+          <option value="dias">Más días trabajados</option>
         </select>
       </label>
     </div>
 
-    <div class="botones">
-      <button onclick="cargarResumen()" class="boton">Ver Todo</button>
-      <button onclick="exportarResumenExcel()" class="boton">Exportar a Excel</button>
-      <button onclick="exportarResumenPDF()" class="boton">Exportar a PDF</button>
-      <button onclick="window.print()" class="boton">Imprimir</button>
+    <!-- ── Botones de acción ── -->
+    <div style="text-align:center; margin: 10px 0;" class="no-print">
+      <button onclick="cargarResumen()" class="boton">↺ Actualizar</button>
+      <button onclick="exportarExcel()" class="boton verde">Exportar Excel</button>
+      <button onclick="exportarPDF()" class="boton verde">Exportar PDF</button>
+      <button onclick="window.print()" class="boton gris">Imprimir</button>
     </div>
 
-    <div id="resumen" style="margin-top:20px;"></div>
+    <!-- ── Tarjetas de resumen global ── -->
+    <div class="cards-resumen" id="cards-resumen"></div>
+
+    <!-- ── Leyenda ── -->
+    <div class="leyenda no-print">
+      <span class="leyenda-item">
+        <span class="semaforo sem-verde"></span> Sin errores
+      </span>
+      <span class="leyenda-item">
+        <span class="semaforo sem-amarillo"></span> Con advertencias
+      </span>
+      <span class="leyenda-item">
+        <span class="semaforo sem-rojo"></span> Días incompletos
+      </span>
+      <span class="leyenda-item" style="color:#b45309;">* = salida automática</span>
+    </div>
+
+    <!-- ── Mensaje de carga ── -->
+    <div id="mensaje-carga">Cargando datos...</div>
+
+    <!-- ── Tabla principal ── -->
+    <div id="contenedor-tabla"></div>
+
     <br>
-    <a href="admin.html" class="boton">Volver al Panel</a>
+    <div class="no-print" style="text-align:center;">
+      <a href="admin.html" class="boton gris">← Volver al Panel</a>
+    </div>
   </div>
 
   <script>
-    let datosTodos = [];
-    let resumenFinal = [];
-    let mapaNombres = {};
+    // ══════════════════════════════════════════════
+    // QUINCENAS (Sábado → Viernes, 14 días)
+    // ══════════════════════════════════════════════
+    const ANCHOR = new Date(2026, 2, 21); // 21 Mar 2026
 
+    function quincenaDeHoy() {
+      const hoy = new Date(); hoy.setHours(0,0,0,0);
+      const diffDia = Math.floor((hoy - ANCHOR) / 86400000);
+      const ciclo   = Math.floor(diffDia / 14);
+      const inicio  = new Date(ANCHOR);
+      inicio.setDate(ANCHOR.getDate() + ciclo * 14);
+      const fin = new Date(inicio); fin.setDate(inicio.getDate() + 13);
+      return { inicio, fin };
+    }
+
+    function quincenaDesdeFecha(fecha) {
+      fecha.setHours(0,0,0,0);
+      const diffDia = Math.floor((fecha - ANCHOR) / 86400000);
+      const ciclo   = Math.floor(diffDia / 14);
+      const inicio  = new Date(ANCHOR);
+      inicio.setDate(ANCHOR.getDate() + ciclo * 14);
+      const fin = new Date(inicio); fin.setDate(inicio.getDate() + 13);
+      return { inicio, fin };
+    }
+
+    function fmtISO(d) {
+      return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    }
+
+    function fmtCorta(iso) {
+      if (!iso || !iso.includes('-')) return '';
+      const [y,m,d] = iso.split('-');
+      return `${m}/${d}/${y}`;
+    }
+
+    function setQuincena(q) {
+      document.getElementById('fechaDesde').value = fmtISO(q.inicio);
+      document.getElementById('fechaHasta').value = fmtISO(q.fin);
+      actualizarInfoQ();
+    }
+
+    function actualizarInfoQ() {
+      const d = document.getElementById('fechaDesde').value;
+      const h = document.getElementById('fechaHasta').value;
+      document.getElementById('info-quincena').textContent =
+        d && h ? `📅 Quincena: ${fmtCorta(d)} → ${fmtCorta(h)}` : '';
+    }
+
+    function quincenaAnterior() {
+      const d = document.getElementById('fechaDesde').value;
+      if (!d) return;
+      const fecha = new Date(d + 'T12:00:00');
+      fecha.setDate(fecha.getDate() - 14);
+      setQuincena(quincenaDesdeFecha(fecha));
+      cargarResumen();
+    }
+
+    function quincenaSiguiente() {
+      const h = document.getElementById('fechaHasta').value;
+      if (!h) return;
+      const fecha = new Date(h + 'T12:00:00');
+      fecha.setDate(fecha.getDate() + 1);
+      setQuincena(quincenaDesdeFecha(fecha));
+      cargarResumen();
+    }
+
+    function aplicarFiltro() {
+      const d = document.getElementById('fechaDesde').value;
+      const h = document.getElementById('fechaHasta').value;
+      if (!d || !h) { alert('Selecciona ambas fechas.'); return; }
+      if (d > h) { alert('La fecha "Desde" no puede ser mayor que "Hasta".'); return; }
+      actualizarInfoQ();
+      cargarResumen();
+    }
+
+    // ══════════════════════════════════════════════
+    // DATOS GLOBALES
+    // ══════════════════════════════════════════════
+    let resumenGlobal = []; // array de objetos por empleado ya calculados
+
+    // ══════════════════════════════════════════════
+    // CARGA PRINCIPAL
+    // ══════════════════════════════════════════════
     async function cargarResumen() {
+      document.getElementById('mensaje-carga').textContent = 'Cargando datos...';
+      document.getElementById('contenedor-tabla').innerHTML = '';
+      document.getElementById('cards-resumen').innerHTML = '';
+
       try {
         const [usuariosRes, datosRes] = await Promise.all([
-          fetch('/api/usuarios'),
+          fetch('/api/usuarios-detalle'),
           fetch('/api/reporte-todos')
         ]);
-        if (!usuariosRes.ok || !datosRes.ok) throw new Error('Error cargando datos');
-        mapaNombres = await usuariosRes.json();
-        datosTodos = await datosRes.json();
-        llenarSelectDepartamentos();
-        renderResumen(datosTodos);
+        if (!usuariosRes.ok || !datosRes.ok) throw new Error('Error del servidor');
+
+        const usuariosDetalle = await usuariosRes.json(); // [{usuario, nombre, activo, estado}]
+        const todosMarcajes   = await datosRes.json();
+
+        const desde = document.getElementById('fechaDesde').value;
+        const hasta = document.getElementById('fechaHasta').value;
+
+        // Filtrar por rango de fechas
+        const marcajesFiltrados = todosMarcajes.filter(r => {
+          if (desde && r.fecha < desde) return false;
+          if (hasta && r.fecha > hasta) return false;
+          return true;
+        });
+
+        // Agrupar marcajes por usuario → por fecha
+        const porUsuario = {};
+        marcajesFiltrados.forEach(r => {
+          if (!porUsuario[r.usuario]) porUsuario[r.usuario] = {};
+          if (!porUsuario[r.usuario][r.fecha]) porUsuario[r.usuario][r.fecha] = [];
+          porUsuario[r.usuario][r.fecha].push(r);
+        });
+
+        // Llenar select de departamentos
+        const deptos = [...new Set(
+          usuariosDetalle.filter(u => u.activo).map(u => {
+            // Obtener departamento desde los marcajes si no está en el detalle
+            const regs = Object.values(porUsuario[u.usuario] || {}).flat();
+            return regs.length ? (regs[0].departamento || '') : '';
+          }).filter(Boolean)
+        )].sort();
+        const sel = document.getElementById('filtroDept');
+        const selVal = sel.value;
+        sel.innerHTML = '<option value="todos">Todos</option>';
+        deptos.forEach(d => {
+          const opt = document.createElement('option');
+          opt.value = d; opt.textContent = d;
+          sel.appendChild(opt);
+        });
+        sel.value = selVal;
+
+        // Calcular resumen por empleado
+        resumenGlobal = usuariosDetalle
+          .filter(u => u.activo)
+          .map(u => {
+            const diasData = porUsuario[u.usuario] || {};
+            let totalMs        = 0;
+            let diasTrabajados = 0;
+            let diasSinSalida  = 0;
+            let salidasAuto    = 0;
+            let diasFueraGeo   = 0;
+            let tardanzas      = 0;
+            let departamento   = '';
+
+            Object.entries(diasData).forEach(([fecha, regs]) => {
+              const get = tipo => regs.find(r => r.tipo === tipo) || null;
+              const entrada = get('entrada');
+              const salida  = get('salida');
+              const esAuto  = salida && (salida.auto === 1 || salida.auto === true);
+
+              // Departamento (tomar del primer registro)
+              if (!departamento && regs[0]) departamento = regs[0].departamento || '';
+
+              // Días trabajados (tiene al menos entrada)
+              if (entrada) diasTrabajados++;
+
+              // Días sin salida
+              if (entrada && !salida) diasSinSalida++;
+
+              // Salidas automáticas
+              if (esAuto) salidasAuto++;
+
+              // Fuera de geocerca
+              if (regs.some(r => r.insideGeofence === false || r.insideGeofence === 0)) diasFueraGeo++;
+
+              // Tardanzas
+              if (entrada && (entrada.hora || '') > '09:35:00') tardanzas++;
+
+              // Horas (entrada → salida, sin descuento)
+              if (entrada && salida) {
+                const ini = new Date(`${fecha}T${(entrada.hora||'').slice(0,5)}:00`);
+                const fin = new Date(`${fecha}T${(salida.hora ||'').slice(0,5)}:00`);
+                if (!isNaN(ini) && !isNaN(fin) && fin > ini) totalMs += fin - ini;
+              }
+            });
+
+            const horas = Math.floor(totalMs / 3600000);
+            const mins  = Math.floor((totalMs % 3600000) / 60000);
+            const totalHorasStr = totalMs > 0 ? `${horas}h ${String(mins).padStart(2,'0')}m` : '—';
+            const totalHorasNum = totalMs / 3600000;
+
+            // Semáforo
+            let semaforo = 'verde';
+            if (diasSinSalida > 0) semaforo = 'rojo';
+            else if (salidasAuto > 0 || tardanzas > 0 || diasFueraGeo > 0) semaforo = 'amarillo';
+
+            return {
+              usuario:       u.usuario,
+              nombre:        u.nombre || u.usuario,
+              departamento,
+              diasTrabajados,
+              diasSinSalida,
+              salidasAuto,
+              diasFueraGeo,
+              tardanzas,
+              totalHorasStr,
+              totalHorasNum,
+              semaforo,
+              totalErrores: diasSinSalida + salidasAuto
+            };
+          });
+
+        // Tarjetas de resumen global
+        const totalEmpleados  = resumenGlobal.length;
+        const sinErrores      = resumenGlobal.filter(e => e.semaforo === 'verde').length;
+        const conAdvertencias = resumenGlobal.filter(e => e.semaforo === 'amarillo').length;
+        const conErrores      = resumenGlobal.filter(e => e.semaforo === 'rojo').length;
+        const totalHorasAll   = resumenGlobal.reduce((s, e) => s + e.totalHorasNum, 0);
+        const hAllT = Math.floor(totalHorasAll);
+        const mAllT = Math.round((totalHorasAll - hAllT) * 60);
+
+        document.getElementById('cards-resumen').innerHTML = `
+          <div class="card-stat azul">
+            <div class="numero">${totalEmpleados}</div>
+            <div class="etiqueta">Empleados activos</div>
+          </div>
+          <div class="card-stat verde">
+            <div class="numero">${sinErrores}</div>
+            <div class="etiqueta">Sin errores</div>
+          </div>
+          <div class="card-stat naranja">
+            <div class="numero">${conAdvertencias}</div>
+            <div class="etiqueta">Con advertencias</div>
+          </div>
+          <div class="card-stat rojo">
+            <div class="numero">${conErrores}</div>
+            <div class="etiqueta">Con días incompletos</div>
+          </div>
+          <div class="card-stat azul">
+            <div class="numero">${hAllT}h ${String(mAllT).padStart(2,'0')}m</div>
+            <div class="etiqueta">Total horas del equipo</div>
+          </div>
+        `;
+
+        document.getElementById('mensaje-carga').textContent = '';
+        renderTabla();
+
       } catch (err) {
-        alert('Error cargando información del servidor.');
         console.error(err);
+        document.getElementById('mensaje-carga').textContent =
+          '❌ Error cargando datos. Verifica tu conexión.';
       }
     }
 
-    function llenarSelectDepartamentos() {
-      const selectDepto = document.getElementById("departamento");
-      const departamentos = [...new Set(datosTodos.map(r => r.departamento || ''))];
-      selectDepto.innerHTML = '<option value="todos">Todos</option>';
-      departamentos.forEach(d => {
-        if (d.trim()) {
-          const option = document.createElement("option");
-          option.value = d;
-          option.textContent = d;
-          selectDepto.appendChild(option);
-        }
-      });
-    }
+    // ══════════════════════════════════════════════
+    // RENDERIZAR TABLA CON FILTROS Y ORDEN
+    // ══════════════════════════════════════════════
+    function renderTabla() {
+      const dept   = document.getElementById('filtroDept').value;
+      const busca  = (document.getElementById('filtroBusca').value || '').toLowerCase().trim();
+      const orden  = document.getElementById('filtroOrden').value;
 
-    function filtrarPorDepartamento() {
-      const depto = document.getElementById("departamento").value;
-      if (depto === "todos") {
-        renderResumen(datosTodos);
-      } else {
-        const filtrados = datosTodos.filter(r => (r.departamento || '').toLowerCase() === depto.toLowerCase());
-        renderResumen(filtrados);
+      let datos = [...resumenGlobal];
+
+      // Filtro departamento
+      if (dept !== 'todos') {
+        datos = datos.filter(e => (e.departamento || '').toLowerCase() === dept.toLowerCase());
       }
-    }
 
-    function filtrarPorFecha() {
-      const desde = document.getElementById("fechaInicio").value;
-      const hasta = document.getElementById("fechaFin").value;
-      if (!desde || !hasta) {
-        alert("Debes seleccionar ambas fechas.");
+      // Filtro búsqueda
+      if (busca) {
+        datos = datos.filter(e =>
+          e.nombre.toLowerCase().includes(busca) ||
+          e.usuario.toLowerCase().includes(busca)
+        );
+      }
+
+      // Ordenar
+      if (orden === 'horas_desc') datos.sort((a,b) => b.totalHorasNum - a.totalHorasNum);
+      else if (orden === 'horas_asc') datos.sort((a,b) => a.totalHorasNum - b.totalHorasNum);
+      else if (orden === 'errores') datos.sort((a,b) => b.totalErrores - a.totalErrores);
+      else if (orden === 'dias') datos.sort((a,b) => b.diasTrabajados - a.diasTrabajados);
+      else datos.sort((a,b) => a.nombre.localeCompare(b.nombre));
+
+      if (!datos.length) {
+        document.getElementById('contenedor-tabla').innerHTML =
+          '<p style="text-align:center;color:#888;margin:20px 0;">No hay empleados que coincidan con el filtro.</p>';
         return;
       }
-      const filtrados = datosTodos.filter(r => r.fecha >= desde && r.fecha <= hasta);
-      renderResumen(filtrados);
+
+      let html = `
+        <table class="tabla-resumen">
+          <thead>
+            <tr>
+              <th style="text-align:left;padding-left:16px;">Empleado</th>
+              <th>Departamento</th>
+              <th>Dias Trabajados</th>
+              <th>Total Horas</th>
+              <th>Alertas</th>
+              <th class="no-print">Acciones</th>
+            </tr>
+          </thead>
+          <tbody>
+      `;
+
+      datos.forEach(e => {
+        const clsFila = e.semaforo === 'rojo' ? 'fila-error'
+                      : e.semaforo === 'amarillo' ? 'fila-warn'
+                      : 'fila-ok';
+
+        const clsSem = `semaforo sem-${e.semaforo}`;
+
+        // Badges de alerta
+        let badgesHTML = '';
+        if (e.diasSinSalida > 0)
+          badgesHTML += `<span class="badge badge-error">⛔ ${e.diasSinSalida} sin salida</span>`;
+        if (e.salidasAuto > 0)
+          badgesHTML += `<span class="badge badge-auto">⚠ ${e.salidasAuto} salida auto</span>`;
+        if (e.tardanzas > 0)
+          badgesHTML += `<span class="badge badge-warn">🕐 ${e.tardanzas} tardanza${e.tardanzas > 1 ? 's' : ''}</span>`;
+        if (e.diasFueraGeo > 0)
+          badgesHTML += `<span class="badge badge-geo">📍 ${e.diasFueraGeo} fuera geocerca</span>`;
+        if (!badgesHTML)
+          badgesHTML = `<span class="badge badge-ok">✓ Sin errores</span>`;
+
+        html += `
+          <tr class="${clsFila}" onclick="verReporte('${e.usuario}')" title="Ver reporte de ${e.nombre}">
+            <td>
+              <div class="nombre-celda">
+                <span class="${clsSem}"></span>
+                <div>
+                  <strong>${e.nombre}</strong><br>
+                  <span style="font-size:11px;color:#999;">${e.usuario}</span>
+                </div>
+              </div>
+            </td>
+            <td>${e.departamento || '—'}</td>
+            <td>${e.diasTrabajados}</td>
+            <td class="horas-txt">${e.totalHorasStr}</td>
+            <td style="text-align:left;">${badgesHTML}</td>
+            <td class="no-print" onclick="event.stopPropagation()">
+              <button onclick="verReporte('${e.usuario}')" class="boton pequeño">Ver</button>
+              <button onclick="corregir('${e.usuario}')" class="boton pequeño" style="background:#84ae05;">Corregir</button>
+            </td>
+          </tr>
+        `;
+      });
+
+      html += `</tbody></table>`;
+      document.getElementById('contenedor-tabla').innerHTML = html;
     }
 
-    function renderResumen(data) {
-      const resumen = {};
-      resumenFinal = [];
-
-      data.forEach(r => {
-        const nombre = mapaNombres[r.usuario] || r.usuario;
-        if (!resumen[nombre]) {
-          resumen[nombre] = {
-            departamento: r.departamento || '',
-            dias: new Set(),
-            totalMs: 0
-          };
-        }
-        resumen[nombre].dias.add(r.fecha);
-      });
-
-      const agrupado = {};
-      data.forEach(r => {
-        const nombre = mapaNombres[r.usuario] || r.usuario;
-        if (!agrupado[nombre]) agrupado[nombre] = {};
-        if (!agrupado[nombre][r.fecha]) agrupado[nombre][r.fecha] = [];
-        agrupado[nombre][r.fecha].push(r);
-      });
-
-      Object.entries(agrupado).forEach(([nombre, fechas]) => {
-        Object.values(fechas).forEach(regs => {
-          const entradas = regs.filter(x => x.tipo === 'entrada').sort((a,b) => a.hora.localeCompare(b.hora));
-          const salidas = regs.filter(x => x.tipo === 'salida').sort((a,b) => a.hora.localeCompare(b.hora));
-          if (entradas.length && salidas.length) {
-            // Ignorar segundos: tomar solo HH:MM para evitar decimales por segundos acumulados
-            const horaIni = (entradas[0].hora || '').slice(0, 5);
-            const horaFin = (salidas[salidas.length - 1].hora || '').slice(0, 5);
-            const ini = new Date(`${regs[0].fecha}T${horaIni}:00`);
-            const fin = new Date(`${regs[0].fecha}T${horaFin}:00`);
-            resumen[nombre].totalMs += fin - ini;
-          }
-        });
-      });
-
-      let html = '<h2 style="text-align:center">Resumen por Empleado</h2>';
-      html += '<table border="1" style="margin:auto;border-collapse:collapse;">'
-           +  '<tr><th>Nombre Completo</th><th>Departamento</th><th>Días Trabajados</th><th>Total de Horas</th></tr>';
-      Object.entries(resumen).forEach(([nombre, info]) => {
-        const horas = (info.totalMs / 3600000).toFixed(2);
-        resumenFinal.push({
-          "Nombre Completo": nombre,
-          "Departamento": info.departamento,
-          "Días Trabajados": info.dias.size,
-          "Total de Horas": horas
-        });
-        html += `<tr>
-          <td>${nombre}</td>
-          <td>${info.departamento}</td>
-          <td>${info.dias.size}</td>
-          <td>${horas}</td>
-        </tr>`;
-      });
-      html += '</table>';
-      document.getElementById('resumen').innerHTML = html;
+    function verReporte(usuario) {
+      window.location.href = `reporte.html?usuario=${encodeURIComponent(usuario)}`;
     }
 
-    function exportarResumenExcel() {
-      if (!resumenFinal.length) {
-        alert("No hay datos para exportar.");
-        return;
-      }
-      const ws = XLSX.utils.json_to_sheet(resumenFinal);
+    function corregir(usuario) {
+      window.location.href = `corregir.html?usuario=${encodeURIComponent(usuario)}`;
+    }
+
+    // ══════════════════════════════════════════════
+    // EXPORTAR EXCEL
+    // ══════════════════════════════════════════════
+    function exportarExcel() {
+      if (!resumenGlobal.length) { alert('Primero carga los datos.'); return; }
+
+      const desde = document.getElementById('fechaDesde').value;
+      const hasta = document.getElementById('fechaHasta').value;
+
+      const rows = resumenGlobal.map(e => ({
+        'Nombre':           e.nombre,
+        'Usuario':          e.usuario,
+        'Departamento':     e.departamento || '—',
+        'Dias Trabajados':  e.diasTrabajados,
+        'Total Horas':      e.totalHorasStr,
+        'Dias Sin Salida':  e.diasSinSalida,
+        'Salidas Auto':     e.salidasAuto,
+        'Tardanzas':        e.tardanzas,
+        'Dias Fuera Geo':   e.diasFueraGeo,
+        'Estado':           e.semaforo === 'rojo' ? 'Con errores'
+                          : e.semaforo === 'amarillo' ? 'Con advertencias'
+                          : 'Sin errores'
+      }));
+
+      const ws = XLSX.utils.json_to_sheet(rows);
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, 'Resumen');
-      XLSX.writeFile(wb, 'resumen-empleados.xlsx');
+      ws['!cols'] = [
+        {wpx:160},{wpx:100},{wpx:120},{wpx:100},{wpx:90},
+        {wpx:100},{wpx:90},{wpx:80},{wpx:100},{wpx:110}
+      ];
+      const periodo = desde && hasta ? `_${desde}_al_${hasta}` : '';
+      XLSX.writeFile(wb, `resumen-empleados${periodo}.xlsx`);
     }
 
-    function exportarResumenPDF() {
-      if (!resumenFinal.length) {
-        alert("No hay datos para exportar.");
-        return;
-      }
+    // ══════════════════════════════════════════════
+    // EXPORTAR PDF
+    // ══════════════════════════════════════════════
+    function exportarPDF() {
+      if (!resumenGlobal.length) { alert('Primero carga los datos.'); return; }
+
+      const desde = document.getElementById('fechaDesde').value;
+      const hasta = document.getElementById('fechaHasta').value;
+
       const { jsPDF } = window.jspdf;
-      const doc = new jsPDF();
+      const doc = new jsPDF({ orientation: 'landscape' });
       const img = new Image();
       img.src = 'logo-dinex.png';
       img.onload = () => {
-        doc.addImage(img, 'PNG', 14, 8, 50, 15);
-        doc.setFontSize(14);
-        doc.text('Resumen por Empleado', 70, 20);
-        const cols = ['Nombre Completo', 'Departamento', 'Días Trabajados', 'Total de Horas'];
-        const filas = resumenFinal.map(r => [
-          r["Nombre Completo"],
-          r["Departamento"],
-          r["Días Trabajados"],
-          r["Total de Horas"]
+        doc.addImage(img, 'PNG', 14, 6, 40, 12);
+        doc.setFontSize(13); doc.setTextColor(30);
+        doc.text('Resumen por Empleado', 60, 13);
+        doc.setFontSize(10); doc.setTextColor(100);
+        if (desde && hasta) doc.text(`Periodo: ${fmtCorta(desde)} al ${fmtCorta(hasta)}`, 60, 19);
+
+        const filas = resumenGlobal.map(e => [
+          e.nombre,
+          e.departamento || '—',
+          String(e.diasTrabajados),
+          e.totalHorasStr,
+          e.diasSinSalida > 0 ? `${e.diasSinSalida} sin salida` : '',
+          e.salidasAuto   > 0 ? `${e.salidasAuto} auto` : '',
+          e.tardanzas     > 0 ? `${e.tardanzas} tard.` : '',
+          e.semaforo === 'rojo' ? 'Con errores'
+            : e.semaforo === 'amarillo' ? 'Advertencias' : 'OK'
         ]);
+
         doc.autoTable({
-          startY: 30,
-          head: [cols],
+          startY: 24,
+          head: [['Nombre','Departamento','Dias','Total Horas','Sin Salida','Sal. Auto','Tardanzas','Estado']],
           body: filas,
-          styles: { fontSize: 9 }
+          styles: { fontSize: 8, halign: 'center' },
+          headStyles: { fillColor: [236, 0, 140], textColor: 255 },
+          columnStyles: { 0: { halign: 'left' } },
+          didParseCell: (data) => {
+            if (data.section === 'body') {
+              const estado = data.row.raw[7];
+              if (estado === 'Con errores')   data.cell.styles.fillColor = [255, 240, 240];
+              else if (estado === 'Advertencias') data.cell.styles.fillColor = [255, 252, 235];
+            }
+          }
         });
-        doc.save('resumen-empleados.pdf');
+
+        const periodo = desde && hasta ? `_${desde}_al_${hasta}` : '';
+        doc.save(`resumen-empleados${periodo}.pdf`);
       };
     }
-    // Cargar datos automáticamente al abrir la página
-    document.addEventListener('DOMContentLoaded', cargarResumen);
+
+    // ══════════════════════════════════════════════
+    // INICIALIZACIÓN
+    // ══════════════════════════════════════════════
+    document.addEventListener('DOMContentLoaded', () => {
+      setQuincena(quincenaDeHoy());
+      cargarResumen();
+    });
   </script>
   <script src="common.js"></script>
 </body>

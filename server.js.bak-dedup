@@ -696,24 +696,17 @@ app.get('/api/reporte', apiRateLimit, (req, res) => {
     const users = readJsonSafe(PATHS.users, []);
     const user = users.find(u => u.usuario === usuario);
     if (!user) return res.json([]);
-
-    // Filtro opcional de fechas — si no se mandan, devuelve todo (compatible con versiones anteriores)
-    const desde = req.query.desde || null;
-    const hasta = req.query.hasta || null;
-
-    let query  = `SELECT * FROM registros WHERE usuario = ?`;
-    const params = [usuario];
-    if (desde) { query += ` AND fecha >= ?`; params.push(desde); }
-    if (hasta) { query += ` AND fecha <= ?`; params.push(hasta); }
-    query += ` ORDER BY fecha ASC, hora ASC`;
-
-    db.all(query, params, (err, rows) => {
-      if (err) {
-        console.error('SQLite reporte:', err.message);
-        return res.status(500).json([]);
+    db.all(
+      `SELECT * FROM registros WHERE usuario = ? ORDER BY fecha ASC, hora ASC`,
+      [usuario],
+      (err, rows) => {
+        if (err) {
+          console.error('SQLite reporte:', err.message);
+          return res.status(500).json([]);
+        }
+        res.json(rows);
       }
-      res.json(rows);
-    });
+    );
   } catch (e) {
     console.error('GET /api/reporte error:', e);
     res.status(500).json([]);
@@ -768,24 +761,18 @@ app.get('/api/reporte-todos', apiRateLimit, (req, res) => {
 
     if (activos.length === 0) return res.json([]);
 
-    // Filtro opcional de fechas — si no se mandan, devuelve todo (compatible con versiones anteriores)
-    const desde = req.query.desde || null;
-    const hasta = req.query.hasta || null;
-
     const placeholders = activos.map(() => '?').join(',');
-    let query  = `SELECT * FROM registros WHERE usuario IN (${placeholders})`;
-    const params = [...activos];
-    if (desde) { query += ` AND fecha >= ?`; params.push(desde); }
-    if (hasta) { query += ` AND fecha <= ?`; params.push(hasta); }
-    query += ` ORDER BY usuario ASC, fecha ASC, hora ASC`;
-
-    db.all(query, params, (err, rows) => {
-      if (err) {
-        console.error('SQLite reporte-todos:', err.message);
-        return res.status(500).json({ error: 'Error leyendo base de datos.' });
+    db.all(
+      `SELECT * FROM registros WHERE usuario IN (${placeholders}) ORDER BY usuario ASC, fecha ASC, hora ASC`,
+      activos,
+      (err, rows) => {
+        if (err) {
+          console.error('SQLite reporte-todos:', err.message);
+          return res.status(500).json({ error: 'Error leyendo base de datos.' });
+        }
+        res.json(rows);
       }
-      res.json(rows);
-    });
+    );
   } catch (e) {
     console.error('GET /api/reporte-todos error:', e);
     res.status(500).json({ error: 'Error interno leyendo marcajes.' });
@@ -982,7 +969,6 @@ app.post('/api/corregir-hora', verificarAdmin, (req, res) => {
 });
 
 // ==== [FIX C-3] agregar-marcaje ahora requiere verificarAdmin ====
-// ==== [FIX C-4] Validación anti-duplicado en agregar-marcaje manual ====
 app.post('/api/agregar-marcaje', verificarAdmin, (req, res) => {
   try {
     const { usuario, departamento, tipo, fecha, hora } = req.body || {};
@@ -991,33 +977,18 @@ app.post('/api/agregar-marcaje', verificarAdmin, (req, res) => {
     }
     const ip = getRealIp(req);
 
-    // Verificar si ya existe ese tipo de marcaje para ese usuario y fecha
-    db.get(
-      `SELECT id FROM registros WHERE usuario = ? AND tipo = ? AND fecha = ?`,
-      [usuario, tipo, fecha],
-      (errCheck, existing) => {
-        if (errCheck) {
-          console.error('SQLite check duplicado:', errCheck.message);
-          return res.status(500).json({ success: false, mensaje: 'Error interno al verificar duplicados.' });
+    db.run(
+      `INSERT INTO registros (usuario, tipo, fecha, hora, ip, departamento) VALUES (?, ?, ?, ?, ?, ?)`,
+      [usuario, tipo, fecha, hora, ip, departamento],
+      (err) => {
+        if (err) {
+          console.error('SQLite insertar manual:', err.message);
+          return res.json({ success: false, mensaje: 'Error al guardar en la base de datos.' });
         }
-        if (existing) {
-          return res.json({ success: false, mensaje: `Ya existe un registro de "${tipo}" para ${usuario} el ${fecha}.` });
-        }
-
-        db.run(
-          `INSERT INTO registros (usuario, tipo, fecha, hora, ip, departamento) VALUES (?, ?, ?, ?, ?, ?)`,
-          [usuario, tipo, fecha, hora, ip, departamento],
-          (err) => {
-            if (err) {
-              console.error('SQLite insertar manual:', err.message);
-              return res.json({ success: false, mensaje: 'Error al guardar en la base de datos.' });
-            }
-            const all = readJsonSafe(PATHS.marcajes, []);
-            all.push({ usuario, departamento, tipo, fecha, hora, ip });
-            writeJsonSafe(PATHS.marcajes, all);
-            res.json({ success: true, mensaje: 'Registro agregado correctamente.' });
-          }
-        );
+        const all = readJsonSafe(PATHS.marcajes, []);
+        all.push({ usuario, departamento, tipo, fecha, hora, ip });
+        writeJsonSafe(PATHS.marcajes, all);
+        res.json({ success: true, mensaje: 'Registro agregado correctamente.' });
       }
     );
   } catch (e) {

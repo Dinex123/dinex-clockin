@@ -1,0 +1,696 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Corregir Horas</title>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    .contenedor { max-width: 860px; margin: 0 auto; padding: 20px; }
+    .boton {
+      display: inline-block; padding: 8px 16px; font-size: 14px;
+      text-align: center; border: none; border-radius: 6px;
+      cursor: pointer; background: #e6007e; color: #fff;
+      min-width: 100px; margin: 4px; text-decoration: none;
+    }
+    .boton.danger { background: #ea1902; }
+    .boton:hover  { opacity: 0.85; }
+    .boton.verde  { background: #84ae05; }
+    .boton.verde:hover { background: #6a8c04; opacity: 1; }
+
+    /* Buscador con autocomplete */
+    .search-wrap { position: relative; display: inline-block; margin-right: 6px; }
+    .search-wrap input {
+      padding: 7px 12px; font-size: 14px; width: 250px;
+      border: 1px solid #ccc; border-radius: 6px; outline: none;
+    }
+    .search-wrap input:focus { border-color: #e6007e; }
+    #sugerencias {
+      display: none; position: absolute; left: 0; right: 0; top: 100%;
+      background: #fff; border: 1px solid #ccc; border-top: none;
+      border-radius: 0 0 8px 8px; margin: 0; padding: 0;
+      list-style: none; z-index: 200; max-height: 220px;
+      overflow-y: auto; box-shadow: 0 4px 12px rgba(0,0,0,.12);
+    }
+    #sugerencias li {
+      padding: 9px 14px; cursor: pointer; font-size: 13px;
+      border-bottom: 1px solid #f0f0f0;
+    }
+    #sugerencias li:hover, #sugerencias li.activo { background: #f7f0fb; }
+
+    /* ═══════════════════════════════════════
+       FILTRO DE FECHAS QUINCENAL (NUEVO)
+       ═══════════════════════════════════════ */
+    .rango-fechas-wrap {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin: 0 0 10px 0;
+      padding: 12px 16px;
+      background: #fafafa;
+      border: 1px solid #e8e8e8;
+      border-radius: 8px;
+    }
+    .rango-fechas-wrap label {
+      font-size: 13px;
+      color: #555;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+    .rango-fechas-wrap input[type="date"] {
+      padding: 6px 10px;
+      font-size: 13px;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      outline: none;
+      color: #333;
+    }
+    .rango-fechas-wrap input[type="date"]:focus { border-color: #e6007e; }
+    .rango-fechas-wrap .separador {
+      font-size: 13px; color: #888;
+    }
+    #info-rango {
+      text-align: center;
+      font-size: 12px;
+      color: #84ae05;
+      font-weight: 600;
+      margin: 0 0 14px 0;
+      min-height: 16px;
+    }
+    /* ══════════════════════════════════════ */
+
+    /* Tabla de registros */
+    #resultado table { width: 100%; border-collapse: collapse; font-size: 13px; margin-bottom: 16px; }
+    #resultado th, #resultado td { padding: 7px 8px; border: 1px solid #ccc; text-align: left; }
+    #resultado th { background: #f5f5f5; font-weight: 600; }
+    #resultado input, #resultado select, #resultado button {
+      font-size: 13px; padding: 4px 6px; box-sizing: border-box; width: 100%;
+    }
+
+    /* Panel Ver Todos los Empleados */
+    #panel-todos {
+      display: none;
+      margin: 0 0 28px 0;
+      background: #fafafa;
+      border: 1px solid #e0e0e0;
+      border-radius: 10px;
+      padding: 20px 24px;
+    }
+    #panel-todos h2 {
+      text-align: center; color: #84ae05;
+      margin-top: 0; margin-bottom: 6px; font-size: 18px;
+    }
+    #panel-todos .subtitulo-panel {
+      text-align: center; color: #888; font-size: 13px; margin-bottom: 16px;
+    }
+    #filtro-todos-wrap {
+      display: flex; justify-content: center; gap: 8px;
+      margin-bottom: 14px; flex-wrap: wrap;
+    }
+    #filtro-todos {
+      padding: 7px 12px; font-size: 14px; width: 260px;
+      border: 1px solid #ccc; border-radius: 6px; outline: none;
+    }
+    #filtro-todos:focus { border-color: #84ae05; }
+    #tabla-todos-wrap {
+      max-height: 340px; overflow-y: auto;
+      border: 1px solid #e0e0e0; border-radius: 6px;
+    }
+    #tabla-todos {
+      width: 100%; border-collapse: collapse; font-size: 13px;
+    }
+    #tabla-todos thead tr {
+      position: sticky; top: 0; background: #f5f5f5; z-index: 1;
+    }
+    #tabla-todos th {
+      padding: 9px 10px; border-bottom: 2px solid #ddd;
+      font-weight: 600; text-align: left; white-space: nowrap;
+    }
+    #tabla-todos td { padding: 8px 10px; border-bottom: 1px solid #f0f0f0; }
+    #tabla-todos tbody tr:hover { background: #f7f0fb; cursor: pointer; }
+    #tabla-todos tbody tr.revisado td { background: #f0fff0; color: #3a7a3a; }
+    #tabla-todos .badge-revisado {
+      display: inline-block; background: #84ae05; color: #fff;
+      font-size: 11px; border-radius: 4px; padding: 2px 7px; margin-left: 6px;
+    }
+    #contador-panel {
+      text-align: center; font-size: 13px; color: #666; margin-top: 10px;
+    }
+    #contador-panel strong { color: #84ae05; }
+
+    /* Sección Agregar Manual */
+    .manual-section {
+      margin-top: 40px; background: #fafafa; border: 1px solid #eee;
+      border-radius: 10px; padding: 24px 28px;
+    }
+    .manual-section h2 { text-align: center; color: #84ae05; margin-top: 0; margin-bottom: 20px; }
+    .manual-grid {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 12px;
+      max-width: 520px; margin: 0 auto;
+    }
+    .manual-grid label { font-size: 13px; color: #555; margin-bottom: 2px; display: block; }
+    .manual-grid select, .manual-grid input {
+      width: 100%; padding: 8px 10px; font-size: 14px;
+      border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box;
+    }
+    .manual-grid select:focus, .manual-grid input:focus { border-color: #e6007e; outline: none; }
+    .manual-grid input[readonly] { background: #f5f5f5; color: #888; }
+    .manual-full { grid-column: 1 / -1; text-align: center; }
+    #mensaje { font-weight: bold; margin-top: 8px; min-height: 20px; text-align: center; }
+  </style>
+</head>
+<body>
+  <script>
+    (function() {
+      if (!sessionStorage.getItem('adminUser')) window.location.replace('admin-login.html');
+    })();
+  </script>
+
+  <div class="contenedor">
+    <img src="logo-dinex.png" alt="Logo DinEX" class="logo" style="display:block;margin:0 auto 16px;max-width:200px;">
+    <h1 style="text-align:center;color:#84ae05;">Corregir Horas</h1>
+
+    <!-- Buscador con autocomplete -->
+    <div style="text-align:center;margin-bottom:16px;">
+      <div class="search-wrap">
+        <input type="text" id="usuario" placeholder="Buscar empleado..."
+          autocomplete="off" oninput="filtrarSugerencias()" onkeydown="teclaLista(event)">
+        <ul id="sugerencias"></ul>
+      </div>
+      <button onclick="buscar()" class="boton">Buscar</button>
+      <a href="admin.html" class="boton">Volver al Panel</a>
+      <button onclick="togglePanelTodos()" class="boton verde" id="btn-ver-todos">
+        👥 Ver Todos los Empleados
+      </button>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════
+         FILTRO DE RANGO DE FECHAS (QUINCENAL) — NUEVO
+         Solo filtra lo que se muestra. No borra nada.
+         ═══════════════════════════════════════════════ -->
+    <div class="rango-fechas-wrap">
+      <label>📅 Desde:</label>
+      <input type="date" id="fechaDesde">
+      <span class="separador">→</span>
+      <label>Hasta:</label>
+      <input type="date" id="fechaHasta">
+      <button onclick="aplicarFiltroFechas()" class="boton" style="font-size:13px;padding:6px 14px;min-width:auto;">
+        Filtrar
+      </button>
+      <button onclick="limpiarFiltroFechas()" class="boton" style="font-size:13px;padding:6px 14px;min-width:auto;background:#888;">
+        Ver Todo
+      </button>
+    </div>
+    <p id="info-rango"></p>
+    <!-- ══════════════════════════════════════════════ -->
+
+    <!-- Panel Ver Todos los Empleados -->
+    <div id="panel-todos">
+      <h2>📋 Lista de Empleados — Revisión Quincenal</h2>
+      <p class="subtitulo-panel">
+        Haz clic en cualquier empleado para cargar sus registros arriba y revisarlos.
+        Los marcados en <span style="color:#3a7a3a;font-weight:bold;">verde</span> ya fueron revisados esta sesión.
+      </p>
+      <div id="filtro-todos-wrap">
+        <input type="text" id="filtro-todos" placeholder="Filtrar por nombre o usuario..."
+               oninput="filtrarTablaTodos()">
+        <button onclick="limpiarFiltroTodos()" class="boton" style="font-size:12px;padding:6px 12px;min-width:auto;">
+          Limpiar
+        </button>
+      </div>
+      <div id="tabla-todos-wrap">
+        <table id="tabla-todos">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Nombre</th>
+              <th>Usuario</th>
+              <th>Departamento</th>
+              <th>Estado</th>
+            </tr>
+          </thead>
+          <tbody id="cuerpo-tabla-todos"></tbody>
+        </table>
+      </div>
+      <p id="contador-panel">Cargando empleados…</p>
+    </div>
+
+    <div id="resultado"></div>
+
+    <!-- Agregar Registro Manual -->
+    <div class="manual-section">
+      <h2>Agregar Registro Manual</h2>
+      <form id="form-agregar-marcaje">
+        <div class="manual-grid">
+          <div>
+            <label>Empleado</label>
+            <select id="usuarioManual" required>
+              <option value="">-- Seleccionar empleado --</option>
+            </select>
+          </div>
+          <div>
+            <label>Departamento</label>
+            <input type="text" id="departamento" readonly placeholder="Auto">
+          </div>
+          <div>
+            <label>Fecha</label>
+            <input type="date" id="fechaManual" required>
+          </div>
+          <div>
+            <label>Hora</label>
+            <input type="time" id="horaManual" required>
+          </div>
+          <div>
+            <label>Tipo de marcaje</label>
+            <select id="tipoManual" required>
+              <option value="entrada">Entrada</option>
+              <option value="salida_lunch">Lunch Out</option>
+              <option value="entrada_lunch">Lunch In</option>
+              <option value="salida">Salida</option>
+            </select>
+          </div>
+          <div style="display:flex;align-items:flex-end;">
+            <button type="submit" class="boton" style="width:100%;margin:0;">Agregar Registro</button>
+          </div>
+          <div class="manual-full">
+            <p id="mensaje"></p>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    let mapaDepartamentos = {};
+    let listaEmpleados    = [];
+    let empleadosRevisados = new Set();
+
+    // Guarda TODOS los registros del empleado actual (sin filtro)
+    let registrosActuales = [];
+    // Guarda el usuario actualmente mostrado
+    let usuarioActual = '';
+
+    // ── Cargar empleados al abrir la página ───────────────────
+    window.addEventListener('DOMContentLoaded', async () => {
+      try {
+        const res   = await fetch('/api/empleados');
+        const users = await res.json();
+        listaEmpleados = users;
+
+        users.forEach(u => { mapaDepartamentos[u.usuario] = u.departamento; });
+
+        const sel = document.getElementById('usuarioManual');
+        users.forEach(u => {
+          const opt = document.createElement('option');
+          opt.value       = u.usuario;
+          opt.textContent = `${u.nombre || u.usuario}  (${u.usuario})`;
+          sel.appendChild(opt);
+        });
+
+        llenarTablaTodos(users);
+
+        // Fechas por defecto: quincena actual (del 1 al 15 o del 16 al fin de mes)
+        const hoy   = new Date();
+        const dia   = hoy.getDate();
+        const anio  = hoy.getFullYear();
+        const mes   = String(hoy.getMonth() + 1).padStart(2, '0');
+        let desdeDefault, hastaDefault;
+        if (dia <= 15) {
+          desdeDefault = `${anio}-${mes}-01`;
+          hastaDefault = `${anio}-${mes}-15`;
+        } else {
+          const ultimoDia = new Date(anio, hoy.getMonth() + 1, 0).getDate();
+          desdeDefault = `${anio}-${mes}-16`;
+          hastaDefault = `${anio}-${mes}-${String(ultimoDia).padStart(2,'0')}`;
+        }
+        document.getElementById('fechaDesde').value = desdeDefault;
+        document.getElementById('fechaHasta').value = hastaDefault;
+
+        // Límite de fechas para el formulario manual
+        const max    = hoy.toISOString().split('T')[0];
+        const hace18 = new Date(hoy.getTime() - 18 * 24 * 60 * 60 * 1000);
+        const min    = hace18.toISOString().split('T')[0];
+        const fi = document.getElementById('fechaManual');
+        fi.setAttribute('max', max);
+        fi.setAttribute('min', min);
+
+      } catch (err) {
+        console.error('Error cargando empleados:', err);
+      }
+    });
+
+    document.getElementById('usuarioManual').addEventListener('change', () => {
+      const u = document.getElementById('usuarioManual').value;
+      document.getElementById('departamento').value = mapaDepartamentos[u] || '';
+    });
+
+    // ── FILTRO DE FECHAS ──────────────────────────────────────
+    function aplicarFiltroFechas() {
+      const desde = document.getElementById('fechaDesde').value;
+      const hasta = document.getElementById('fechaHasta').value;
+      if (!desde || !hasta) {
+        alert('Por favor selecciona fecha Desde y Hasta.');
+        return;
+      }
+      if (desde > hasta) {
+        alert('La fecha "Desde" no puede ser mayor que "Hasta".');
+        return;
+      }
+      // Si ya hay registros cargados, refiltrar sin volver a buscar
+      if (usuarioActual) {
+        mostrarRegistrosFiltrados(registrosActuales, usuarioActual);
+        mostrarInfoRango(desde, hasta, registrosActuales.length);
+      } else {
+        document.getElementById('info-rango').textContent = `📅 Rango activo: ${formatearFecha(desde)} → ${formatearFecha(hasta)}`;
+      }
+    }
+
+    function limpiarFiltroFechas() {
+      document.getElementById('fechaDesde').value = '';
+      document.getElementById('fechaHasta').value = '';
+      document.getElementById('info-rango').textContent = '';
+      // Mostrar todos los registros sin filtro
+      if (usuarioActual && registrosActuales.length) {
+        renderTablaRegistros(registrosActuales, usuarioActual);
+      }
+    }
+
+    function mostrarInfoRango(desde, hasta, totalSinFiltro) {
+      const desde2 = document.getElementById('fechaDesde').value;
+      const hasta2 = document.getElementById('fechaHasta').value;
+      if (!desde2 || !hasta2) {
+        document.getElementById('info-rango').textContent = '';
+        return;
+      }
+      const filtrados = registrosActuales.filter(r => r.fecha >= desde2 && r.fecha <= hasta2);
+      document.getElementById('info-rango').textContent =
+        `📅 Mostrando ${filtrados.length} registros del ${formatearFecha(desde2)} al ${formatearFecha(hasta2)}`;
+    }
+
+    function formatearFecha(f) {
+      if (!f) return '';
+      const [a, m, d] = f.split('-');
+      return `${m}/${d}/${a}`;
+    }
+
+    // Filtra y muestra los registros según el rango activo
+    function mostrarRegistrosFiltrados(todos, usuario) {
+      const desde = document.getElementById('fechaDesde').value;
+      const hasta = document.getElementById('fechaHasta').value;
+      let filtrados = todos;
+      if (desde && hasta) {
+        filtrados = todos.filter(r => r.fecha >= desde && r.fecha <= hasta);
+      }
+      renderTablaRegistros(filtrados, usuario);
+      if (desde && hasta) {
+        document.getElementById('info-rango').textContent =
+          `📅 Mostrando ${filtrados.length} registros del ${formatearFecha(desde)} al ${formatearFecha(hasta)}`;
+      }
+    }
+
+    // Dibuja la tabla de registros en pantalla
+    function renderTablaRegistros(data, usuario) {
+      const cont = document.getElementById('resultado');
+      if (!data.length) {
+        cont.innerHTML = `<p style="text-align:center;color:#e00;">No hay registros en este rango de fechas para "<strong>${usuario}</strong>".</p>`;
+        return;
+      }
+      let html = `<table>
+        <tr><th>Acción</th><th>Fecha</th><th>Hora</th><th>IP</th><th>Editar</th><th>Eliminar</th></tr>`;
+      data.forEach((r, i) => {
+        const rid = r.id || i;
+        html += `<tr>
+          <td><input id="tipo${i}" value="${r.tipo}"></td>
+          <td><input type="date" id="fecha${i}" value="${r.fecha}"></td>
+          <td><input type="time" id="hora${i}" value="${r.hora ? r.hora.slice(0,5) : ''}"></td>
+          <td>${r.ip || '-'}</td>
+          <td><button onclick="guardar('${usuario}',${i},${rid})" class="boton">Guardar</button></td>
+          <td><button onclick="borrar(${rid})" class="boton danger">Eliminar</button></td>
+        </tr>`;
+      });
+      html += '</table>';
+      cont.innerHTML = html;
+    }
+
+    // ── PANEL TODOS ───────────────────────────────────────────
+    function togglePanelTodos() {
+      const panel = document.getElementById('panel-todos');
+      const btn   = document.getElementById('btn-ver-todos');
+      if (panel.style.display === 'none' || panel.style.display === '') {
+        panel.style.display = 'block';
+        btn.textContent = '✖ Cerrar Lista';
+        panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      } else {
+        panel.style.display = 'none';
+        btn.textContent = '👥 Ver Todos los Empleados';
+      }
+    }
+
+    function llenarTablaTodos(users) {
+      const tbody = document.getElementById('cuerpo-tabla-todos');
+      tbody.innerHTML = '';
+      users.forEach((u, i) => {
+        const tr = document.createElement('tr');
+        tr.dataset.usuario = u.usuario;
+        tr.dataset.nombre  = (u.nombre || '').toLowerCase();
+        tr.title = `Clic para ver registros de ${u.nombre || u.usuario}`;
+        tr.innerHTML = `
+          <td style="color:#aaa;font-size:12px;">${i + 1}</td>
+          <td><strong>${u.nombre || u.usuario}</strong></td>
+          <td style="color:#666;">${u.usuario}</td>
+          <td style="color:#666;">${u.departamento || '—'}</td>
+          <td id="estado-${u.usuario}" style="color:#aaa;font-size:12px;">Pendiente</td>
+        `;
+        tr.addEventListener('click', () => { seleccionarEmpleadoDesdePanel(u.usuario); });
+        tbody.appendChild(tr);
+      });
+      actualizarContador();
+    }
+
+    function seleccionarEmpleadoDesdePanel(usuarioId) {
+      document.getElementById('usuario').value = usuarioId;
+      buscar();
+      marcarComoRevisado(usuarioId);
+      setTimeout(() => {
+        document.getElementById('resultado').scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 300);
+    }
+
+    function marcarComoRevisado(usuarioId) {
+      empleadosRevisados.add(usuarioId);
+      const fila = document.querySelector(`#cuerpo-tabla-todos tr[data-usuario="${usuarioId}"]`);
+      if (fila) {
+        fila.classList.add('revisado');
+        const estadoTd = document.getElementById(`estado-${usuarioId}`);
+        if (estadoTd) estadoTd.innerHTML = '<span class="badge-revisado">✔ Revisado</span>';
+      }
+      actualizarContador();
+    }
+
+    function actualizarContador() {
+      const total     = listaEmpleados.length;
+      const revisados = empleadosRevisados.size;
+      const pendientes = total - revisados;
+      const contEl = document.getElementById('contador-panel');
+      if (total === 0) { contEl.innerHTML = 'No hay empleados activos.'; return; }
+      contEl.innerHTML =
+        `Total: <strong>${total}</strong> empleados &nbsp;|&nbsp; ` +
+        `<strong style="color:#84ae05;">${revisados} revisados</strong> &nbsp;|&nbsp; ` +
+        `<strong style="color:#e6007e;">${pendientes} pendientes</strong>`;
+    }
+
+    function filtrarTablaTodos() {
+      const q = document.getElementById('filtro-todos').value.toLowerCase().trim();
+      document.querySelectorAll('#cuerpo-tabla-todos tr').forEach(tr => {
+        const usuario = (tr.dataset.usuario || '').toLowerCase();
+        const nombre  = (tr.dataset.nombre  || '').toLowerCase();
+        tr.style.display = (!q || usuario.includes(q) || nombre.includes(q)) ? '' : 'none';
+      });
+    }
+
+    function limpiarFiltroTodos() {
+      document.getElementById('filtro-todos').value = '';
+      filtrarTablaTodos();
+    }
+
+    // ── Autocomplete ──────────────────────────────────────────
+    function filtrarSugerencias() {
+      const q  = document.getElementById('usuario').value.toLowerCase().trim();
+      const ul = document.getElementById('sugerencias');
+      ul.innerHTML = '';
+      if (!q) { ul.style.display = 'none'; return; }
+      const hits = listaEmpleados.filter(u =>
+        u.usuario.toLowerCase().includes(q) || (u.nombre || '').toLowerCase().includes(q)
+      ).slice(0, 8);
+      if (!hits.length) { ul.style.display = 'none'; return; }
+      hits.forEach(u => {
+        const li = document.createElement('li');
+        li.innerHTML = `<strong>${u.nombre || u.usuario}</strong> <span style="color:#999;">(${u.usuario})</span>`;
+        li.onclick = () => {
+          document.getElementById('usuario').value = u.usuario;
+          ul.style.display = 'none';
+          buscar();
+        };
+        ul.appendChild(li);
+      });
+      ul.style.display = 'block';
+    }
+
+    function teclaLista(e) {
+      const ul    = document.getElementById('sugerencias');
+      const items = ul.querySelectorAll('li');
+      const act   = ul.querySelector('li.activo');
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        const next = act ? act.nextElementSibling : items[0];
+        if (act) act.classList.remove('activo');
+        if (next) next.classList.add('activo');
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        const prev = act ? act.previousElementSibling : items[items.length - 1];
+        if (act) act.classList.remove('activo');
+        if (prev) prev.classList.add('activo');
+      } else if (e.key === 'Enter') {
+        if (act) { act.click(); return; }
+        ul.style.display = 'none';
+        buscar();
+      } else if (e.key === 'Escape') {
+        ul.style.display = 'none';
+      }
+    }
+
+    document.addEventListener('click', e => {
+      if (!e.target.closest('.search-wrap'))
+        document.getElementById('sugerencias').style.display = 'none';
+    });
+
+    // ── Auth headers ──────────────────────────────────────────
+    function adminHeaders() {
+      return {
+        'Content-Type': 'application/json',
+        'x-admin-auth': JSON.stringify({
+          username: sessionStorage.getItem('adminUser') || '',
+          password: sessionStorage.getItem('adminPass') || ''
+        })
+      };
+    }
+
+    // ── Buscar registros de un empleado ───────────────────────
+    async function buscar() {
+      const u    = document.getElementById('usuario').value.trim();
+      const cont = document.getElementById('resultado');
+      if (!u) { alert('Ingresa un usuario'); return; }
+
+      if (document.getElementById('panel-todos').style.display === 'block') {
+        marcarComoRevisado(u);
+      }
+
+      try {
+        const res  = await fetch('/api/reporte?usuario=' + encodeURIComponent(u));
+        const data = await res.json();
+
+        // Guardar todos los registros sin filtro
+        registrosActuales = data;
+        usuarioActual = u;
+
+        if (!data.length) {
+          cont.innerHTML = `<p style="text-align:center;color:#e00;">No se encontraron registros para "<strong>${u}</strong>".</p>`;
+          document.getElementById('info-rango').textContent = '';
+          return;
+        }
+
+        // Aplicar filtro de fechas si está activo
+        mostrarRegistrosFiltrados(data, u);
+
+      } catch (err) {
+        console.error('Error buscando registros:', err);
+      }
+    }
+
+    // ── Guardar corrección ────────────────────────────────────
+    async function guardar(usuario, index, recordId) {
+      try {
+        const tipo    = document.getElementById(`tipo${index}`).value;
+        const fecha   = document.getElementById(`fecha${index}`).value;
+        const horaRaw = document.getElementById(`hora${index}`).value;
+        const hora    = horaRaw.length === 5 ? horaRaw + ':00' : horaRaw;
+        if (!fecha || !hora || !tipo) { alert('Completa todos los campos antes de guardar.'); return; }
+        const res = await fetch('/api/corregir-hora', {
+          method: 'POST', headers: adminHeaders(),
+          body: JSON.stringify({ usuario, index, recordId, tipo, fecha, hora })
+        });
+        const j = await res.json();
+        if (j.success) buscar();
+        else alert('Error al actualizar. Verifica tu sesión de administrador.');
+      } catch (err) {
+        console.error('Error guardando:', err);
+        alert('Error de conexión con el servidor.');
+      }
+    }
+
+    // ── Eliminar registro ─────────────────────────────────────
+    async function borrar(recordId) {
+      if (!confirm('¿Eliminar este registro?')) return;
+      try {
+        const res = await fetch('/api/borrar-marcaje', {
+          method: 'DELETE', headers: adminHeaders(),
+          body: JSON.stringify({ recordId })
+        });
+        const j = await res.json();
+        if (j.success) buscar();
+        else alert('Error al eliminar. Verifica tu sesión de administrador.');
+      } catch (err) {
+        console.error('Error eliminando:', err);
+        alert('Error de conexión con el servidor.');
+      }
+    }
+
+    // ── Agregar registro manual ───────────────────────────────
+    document.getElementById('form-agregar-marcaje').addEventListener('submit', async function(e) {
+      e.preventDefault();
+      const msgEl        = document.getElementById('mensaje');
+      const usuario      = document.getElementById('usuarioManual').value;
+      const departamento = document.getElementById('departamento').value.trim();
+      const fechaInput   = document.getElementById('fechaManual').value;
+      const horaRaw      = document.getElementById('horaManual').value;
+      const hora         = horaRaw.length === 5 ? horaRaw + ':00' : horaRaw;
+      const tipo         = document.getElementById('tipoManual').value;
+
+      if (!usuario) {
+        msgEl.style.color = 'red';
+        msgEl.textContent = 'Selecciona un empleado.';
+        return;
+      }
+      const fechaSel = new Date(fechaInput);
+      const hoy = new Date(); hoy.setHours(0,0,0,0);
+      if (fechaSel > hoy) {
+        msgEl.style.color = 'red';
+        msgEl.textContent = 'No puedes registrar una fecha futura.';
+        return;
+      }
+      try {
+        const res = await fetch('/api/agregar-marcaje', {
+          method: 'POST',
+          headers: adminHeaders(),
+          body: JSON.stringify({ usuario, departamento, tipo, fecha: fechaInput, hora })
+        });
+        const json = await res.json();
+        msgEl.style.color = json.success ? 'green' : 'red';
+        msgEl.textContent = json.mensaje;
+        if (json.success) {
+          document.getElementById('usuario').value = usuario;
+          buscar();
+          this.reset();
+          document.getElementById('departamento').value = '';
+        }
+      } catch (err) {
+        msgEl.style.color = 'red';
+        msgEl.textContent = 'Error de conexión con el servidor.';
+        console.error(err);
+      }
+    });
+  </script>
+  <script src="common.js"></script>
+</body>
+</html>

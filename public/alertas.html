@@ -1,0 +1,612 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Panel de Alertas</title>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    .contenedor { max-width: 1200px; margin: 0 auto; padding: 20px; }
+    .logo { display: block; margin: 0 auto 10px auto; max-width: 220px; }
+    h1 { text-align: center; margin-bottom: 16px; color: #84ae05; }
+
+    /* ── Botones ── */
+    .boton {
+      background-color: #ec008c; color: white; border: none;
+      padding: 9px 18px; margin: 4px; border-radius: 6px;
+      cursor: pointer; font-size: 14px; text-decoration: none;
+      display: inline-block; transition: background .2s;
+    }
+    .boton:hover { background-color: #c60074; }
+    .boton.verde { background-color: #84ae05; }
+    .boton.verde:hover { background-color: #6a8c04; }
+    .boton.gris { background-color: #888; }
+    .boton.gris:hover { background-color: #666; }
+    .boton.pequeño { padding: 5px 12px; font-size: 12px; margin: 2px; }
+    .boton.naranja { background-color: #e67e22; }
+    .boton.naranja:hover { background-color: #ca6f1e; }
+
+    /* ── Selector de quincena ── */
+    .quincena-wrap {
+      display: flex; justify-content: center; align-items: center;
+      gap: 8px; flex-wrap: wrap; margin: 12px 0;
+      padding: 12px 16px; background: #fafafa;
+      border: 1px solid #e8e8e8; border-radius: 8px;
+    }
+    .quincena-wrap label { font-size: 13px; color: #555; font-weight: 600; }
+    .quincena-wrap input[type="date"] {
+      padding: 6px 10px; font-size: 13px;
+      border: 1px solid #ccc; border-radius: 6px; color: #333;
+    }
+    .quincena-wrap input[type="date"]:focus { border-color: #ec008c; outline: none; }
+    .sep { font-size: 13px; color: #888; }
+    #info-quincena {
+      text-align: center; font-size: 12px; color: #84ae05;
+      font-weight: 600; margin: 4px 0 14px; min-height: 16px;
+    }
+
+    /* ── Tarjetas de resumen ── */
+    .cards-wrap {
+      display: flex; gap: 10px; flex-wrap: wrap;
+      justify-content: center; margin: 14px 0;
+    }
+    .card-alerta {
+      border-radius: 8px; padding: 14px 20px;
+      text-align: center; min-width: 140px; cursor: pointer;
+      border: 2px solid transparent; transition: all .2s;
+      box-shadow: 0 1px 4px rgba(0,0,0,.08);
+    }
+    .card-alerta:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,.12); }
+    .card-alerta.activa { border-color: #333; }
+    .card-alerta .num { font-size: 32px; font-weight: bold; line-height: 1; }
+    .card-alerta .lbl { font-size: 12px; margin-top: 5px; font-weight: 600; }
+
+    .card-rojo    { background: #fff5f5; }
+    .card-rojo    .num { color: #c0392b; }
+    .card-rojo    .lbl { color: #922b21; }
+    .card-naranja { background: #fff8ee; }
+    .card-naranja .num { color: #e67e22; }
+    .card-naranja .lbl { color: #b9770e; }
+    .card-amarillo { background: #fffbf0; }
+    .card-amarillo .num { color: #d4ac0d; }
+    .card-amarillo .lbl { color: #9a7d0a; }
+    .card-geo     { background: #fff0f8; }
+    .card-geo     .num { color: #8b0050; }
+    .card-geo     .lbl { color: #6d0040; }
+    .card-verde   { background: #f0fff4; }
+    .card-verde   .num { color: #27ae60; }
+    .card-verde   .lbl { color: #1e8449; }
+
+    /* ── Tabs de categorías ── */
+    .tabs {
+      display: flex; gap: 0; border-bottom: 2px solid #eee;
+      margin: 16px 0 0; flex-wrap: wrap;
+    }
+    .tab {
+      padding: 9px 18px; font-size: 13px; cursor: pointer;
+      border: none; background: none; color: #777;
+      border-bottom: 3px solid transparent; margin-bottom: -2px;
+      transition: all .2s; font-weight: 600;
+    }
+    .tab:hover { color: #333; }
+    .tab.activo { color: #ec008c; border-bottom-color: #ec008c; }
+    .tab .count {
+      display: inline-block; background: #ec008c; color: #fff;
+      font-size: 10px; padding: 1px 6px; border-radius: 10px;
+      margin-left: 5px; font-weight: bold;
+    }
+    .tab.activo-verde .count { background: #27ae60; }
+    .tab.activo-naranja .count { background: #e67e22; }
+    .tab.activo-amarillo .count { background: #d4ac0d; }
+    .tab.activo-geo .count { background: #8b0050; }
+
+    /* ── Tabla de alertas ── */
+    .tabla-alertas {
+      width: 100%; border-collapse: collapse;
+      font-size: 13px; margin-top: 12px;
+      box-shadow: 0 0 6px rgba(0,0,0,.08);
+    }
+    .tabla-alertas th {
+      background: #ec008c; color: white;
+      padding: 10px 8px; font-weight: bold;
+      text-align: center; white-space: nowrap;
+    }
+    .tabla-alertas td {
+      padding: 9px 8px; border-bottom: 1px solid #eee;
+      text-align: center; vertical-align: middle;
+    }
+    .tabla-alertas tbody tr:hover td { background: #fef0f8; }
+
+    /* ── Colores de fila ── */
+    .fila-rojo    { background: #fff5f5; }
+    .fila-naranja { background: #fff8ee; }
+    .fila-amarillo { background: #fffbf0; }
+    .fila-geo     { background: #fff0f8; }
+
+    /* ── Badges ── */
+    .badge {
+      display: inline-block; font-size: 11px; padding: 3px 8px;
+      border-radius: 4px; font-weight: 600; margin: 2px; white-space: nowrap;
+    }
+    .badge-error  { background: #ffe6e6; color: #b01919; }
+    .badge-auto   { background: #fff0d0; color: #7c4a00; }
+    .badge-tard   { background: #fff3e0; color: #b45309; }
+    .badge-geo    { background: #ffe0f0; color: #8b0050; }
+    .badge-ok     { background: #e7f7e7; color: #167c16; }
+
+    /* ── Icono de tipo de alerta ── */
+    .tipo-icono {
+      display: inline-block; width: 28px; height: 28px;
+      border-radius: 50%; line-height: 28px; text-align: center;
+      font-size: 14px; margin-right: 4px; vertical-align: middle;
+    }
+    .icono-rojo    { background: #ffe6e6; }
+    .icono-naranja { background: #fff0d0; }
+    .icono-amarillo { background: #fff3e0; }
+    .icono-geo     { background: #ffe0f0; }
+
+    /* ── Sin datos ── */
+    .sin-datos {
+      text-align: center; padding: 40px 20px;
+      color: #27ae60; font-size: 16px; font-weight: 600;
+    }
+
+    /* ── Cargando ── */
+    #mensaje-carga {
+      text-align: center; font-size: 14px; color: #888;
+      margin: 30px 0; font-style: italic;
+    }
+
+    @media print {
+      .no-print { display: none !important; }
+    }
+  </style>
+</head>
+<body>
+
+  <script>
+    (function() {
+      if (!sessionStorage.getItem('adminUser')) {
+        window.location.replace('admin-login.html');
+      }
+    })();
+  </script>
+
+  <div class="contenedor">
+    <img src="logo-dinex.png" alt="Logo DinEX" class="logo">
+    <h1>⚠️ Panel de Alertas</h1>
+    <p style="text-align:center;color:#777;font-size:14px;margin:-10px 0 14px;">
+      Ve de un vistazo qué empleados tienen problemas en la quincena
+    </p>
+
+    <!-- ── Selector de quincena ── -->
+    <div class="quincena-wrap no-print">
+      <label>📅 Desde:</label>
+      <input type="date" id="fechaDesde">
+      <span class="sep">→</span>
+      <label>Hasta:</label>
+      <input type="date" id="fechaHasta">
+      <button onclick="aplicarFiltro()" class="boton" style="font-size:13px;padding:6px 14px;">Filtrar</button>
+      <button onclick="quincenaAnterior()" class="boton gris" style="font-size:12px;padding:6px 12px;">◀ Anterior</button>
+      <button onclick="quincenaSiguiente()" class="boton gris" style="font-size:12px;padding:6px 12px;">Siguiente ▶</button>
+    </div>
+    <div id="info-quincena"></div>
+
+    <!-- ── Botones ── -->
+    <div style="text-align:center;margin-bottom:14px;" class="no-print">
+      <button onclick="cargarAlertas()" class="boton">↺ Actualizar</button>
+      <a href="reporte-todos.html" class="boton verde">Ver Resumen Completo</a>
+      <a href="admin.html" class="boton gris">← Volver al Panel</a>
+    </div>
+
+    <!-- ── Tarjetas de resumen ── -->
+    <div class="cards-wrap" id="cards-wrap"></div>
+
+    <!-- ── Cargando ── -->
+    <div id="mensaje-carga">Cargando alertas...</div>
+
+    <!-- ── Tabs ── -->
+    <div class="tabs no-print" id="tabs-wrap" style="display:none;"></div>
+
+    <!-- ── Tabla ── -->
+    <div id="contenedor-tabla"></div>
+
+    <br>
+    <div class="no-print" style="text-align:center;">
+      <a href="admin.html" class="boton gris">← Volver al Panel</a>
+    </div>
+  </div>
+
+  <script>
+    // ══════════════════════════════════════════════
+    // QUINCENAS (Sábado → Viernes, 14 días)
+    // ══════════════════════════════════════════════
+    const ANCHOR = new Date(2026, 2, 21); // 21 Mar 2026 — sábado de referencia
+
+    function quincenaDeHoy() {
+      const hoy = new Date(); hoy.setHours(0,0,0,0);
+      const diffDia = Math.floor((hoy - ANCHOR) / 86400000);
+      const ciclo   = Math.floor(diffDia / 14);
+      const inicio  = new Date(ANCHOR);
+      inicio.setDate(ANCHOR.getDate() + ciclo * 14);
+      const fin = new Date(inicio);
+      fin.setDate(inicio.getDate() + 13);
+      return { inicio, fin };
+    }
+
+    function quincenaDesdeFecha(fecha) {
+      fecha.setHours(0,0,0,0);
+      const diffDia = Math.floor((fecha - ANCHOR) / 86400000);
+      const ciclo   = Math.floor(diffDia / 14);
+      const inicio  = new Date(ANCHOR);
+      inicio.setDate(ANCHOR.getDate() + ciclo * 14);
+      const fin = new Date(inicio);
+      fin.setDate(inicio.getDate() + 13);
+      return { inicio, fin };
+    }
+
+    function fmtISO(d) {
+      return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    }
+
+    function fmtCorta(iso) {
+      if (!iso || !iso.includes('-')) return '';
+      const [y,m,d] = iso.split('-');
+      return `${m}/${d}/${y}`;
+    }
+
+    function nombreDia(iso) {
+      const dias = ['Dom','Lun','Mar','Mie','Jue','Vie','Sab'];
+      const [y,m,d] = iso.split('-').map(Number);
+      return dias[new Date(y, m-1, d).getDay()];
+    }
+
+    function setQuincena(q) {
+      document.getElementById('fechaDesde').value = fmtISO(q.inicio);
+      document.getElementById('fechaHasta').value = fmtISO(q.fin);
+      actualizarInfoQ();
+    }
+
+    function actualizarInfoQ() {
+      const d = document.getElementById('fechaDesde').value;
+      const h = document.getElementById('fechaHasta').value;
+      document.getElementById('info-quincena').textContent =
+        d && h ? `📅 Quincena: ${fmtCorta(d)} → ${fmtCorta(h)}` : '';
+    }
+
+    function quincenaAnterior() {
+      const d = document.getElementById('fechaDesde').value;
+      if (!d) return;
+      const fecha = new Date(d + 'T12:00:00');
+      fecha.setDate(fecha.getDate() - 14);
+      setQuincena(quincenaDesdeFecha(fecha));
+      cargarAlertas();
+    }
+
+    function quincenaSiguiente() {
+      const h = document.getElementById('fechaHasta').value;
+      if (!h) return;
+      const fecha = new Date(h + 'T12:00:00');
+      fecha.setDate(fecha.getDate() + 1);
+      setQuincena(quincenaDesdeFecha(fecha));
+      cargarAlertas();
+    }
+
+    function aplicarFiltro() {
+      const d = document.getElementById('fechaDesde').value;
+      const h = document.getElementById('fechaHasta').value;
+      if (!d || !h) { alert('Selecciona ambas fechas.'); return; }
+      if (d > h)    { alert('La fecha "Desde" no puede ser mayor que "Hasta".'); return; }
+      actualizarInfoQ();
+      cargarAlertas();
+    }
+
+    // ══════════════════════════════════════════════
+    // DATOS GLOBALES
+    // ══════════════════════════════════════════════
+    let tabActiva = 'todos';
+    let alertasData = {
+      sinSalida:  [],   // días incompletos (más urgente)
+      salidasAuto:[],   // salidas automáticas
+      tardanzas:  [],   // tardanzas
+      fueraGeo:   [],   // fuera de geocerca
+    };
+
+    // ══════════════════════════════════════════════
+    // CARGA PRINCIPAL
+    // ══════════════════════════════════════════════
+    async function cargarAlertas() {
+      document.getElementById('mensaje-carga').textContent = 'Cargando alertas...';
+      document.getElementById('contenedor-tabla').innerHTML = '';
+      document.getElementById('cards-wrap').innerHTML = '';
+      document.getElementById('tabs-wrap').style.display = 'none';
+
+      try {
+        const [usuariosRes, datosRes] = await Promise.all([
+          fetch('/api/usuarios-detalle'),
+          fetch('/api/reporte-todos')
+        ]);
+        if (!usuariosRes.ok || !datosRes.ok) throw new Error('Error del servidor');
+
+        const usuarios     = await usuariosRes.json();
+        const todosMarcajes = await datosRes.json();
+
+        const desde = document.getElementById('fechaDesde').value;
+        const hasta = document.getElementById('fechaHasta').value;
+
+        // Mapa de nombres
+        const mapaUsuarios = {};
+        usuarios.forEach(u => { mapaUsuarios[u.usuario] = u.nombre || u.usuario; });
+
+        // Filtrar por rango
+        const marcajes = todosMarcajes.filter(r => {
+          if (desde && r.fecha < desde) return false;
+          if (hasta && r.fecha > hasta) return false;
+          return true;
+        });
+
+        // Agrupar por usuario → fecha
+        const porUsuario = {};
+        marcajes.forEach(r => {
+          if (!porUsuario[r.usuario]) porUsuario[r.usuario] = {};
+          if (!porUsuario[r.usuario][r.fecha]) porUsuario[r.usuario][r.fecha] = [];
+          porUsuario[r.usuario][r.fecha].push(r);
+        });
+
+        // Reiniciar alertas
+        alertasData = { sinSalida: [], salidasAuto: [], tardanzas: [], fueraGeo: [] };
+
+        // Procesar cada usuario activo
+        usuarios.filter(u => u.activo).forEach(u => {
+          const diasData = porUsuario[u.usuario] || {};
+          const nombre   = mapaUsuarios[u.usuario] || u.usuario;
+
+          Object.entries(diasData).forEach(([fecha, regs]) => {
+            const get      = tipo => regs.find(r => r.tipo === tipo) || null;
+            const entrada  = get('entrada');
+            const salida   = get('salida');
+            const entLunch = get('entrada_lunch');
+            const esAuto   = salida && (salida.auto === 1 || salida.auto === true);
+            const depto    = regs[0] ? (regs[0].departamento || '—') : '—';
+
+            // Días sin salida (más urgente — rojo)
+            if (entrada && !salida) {
+              alertasData.sinSalida.push({
+                usuario: u.usuario, nombre, depto, fecha,
+                detalle: `Entrada: ${(entrada.hora||'').slice(0,5)} — sin salida registrada`,
+                tipo: 'error'
+              });
+            }
+
+            // Salidas automáticas (naranja)
+            if (esAuto) {
+              alertasData.salidasAuto.push({
+                usuario: u.usuario, nombre, depto, fecha,
+                detalle: `Entrada: ${(entrada?.hora||'').slice(0,5)} — Salida auto: ${(salida.hora||'').slice(0,5)}`,
+                tipo: 'auto'
+              });
+            }
+
+            // Tardanzas (amarillo)
+            if (entrada && (entrada.hora||'') > '09:35:00') {
+              const [hh,mm] = (entrada.hora||'00:00').split(':').map(Number);
+              const mins    = (hh * 60 + mm) - (9 * 60 + 35);
+              alertasData.tardanzas.push({
+                usuario: u.usuario, nombre, depto, fecha,
+                detalle: `Entrada a las ${(entrada.hora||'').slice(0,5)} — ${mins} min tarde`,
+                tipo: 'tardanza'
+              });
+            }
+
+            // Tardanza regreso lunch
+            if (entLunch && (entLunch.hora||'') > '14:05:00') {
+              const [hh,mm] = (entLunch.hora||'00:00').split(':').map(Number);
+              const mins    = (hh * 60 + mm) - (14 * 60 + 5);
+              alertasData.tardanzas.push({
+                usuario: u.usuario, nombre, depto, fecha,
+                detalle: `Regreso lunch a las ${(entLunch.hora||'').slice(0,5)} — ${mins} min tarde`,
+                tipo: 'tardanza'
+              });
+            }
+
+            // Fuera de geocerca (rosa)
+            const fueraGeoRegs = regs.filter(r => r.insideGeofence === false || r.insideGeofence === 0);
+            if (fueraGeoRegs.length > 0) {
+              const tipos = fueraGeoRegs.map(r => r.tipo).join(', ');
+              alertasData.fueraGeo.push({
+                usuario: u.usuario, nombre, depto, fecha,
+                detalle: `Marcaje(s) fuera de geocerca: ${tipos}`,
+                tipo: 'geo'
+              });
+            }
+          });
+        });
+
+        // Ordenar por fecha → nombre
+        const ordenar = arr => arr.sort((a,b) => a.fecha.localeCompare(b.fecha) || a.nombre.localeCompare(b.nombre));
+        ordenar(alertasData.sinSalida);
+        ordenar(alertasData.salidasAuto);
+        ordenar(alertasData.tardanzas);
+        ordenar(alertasData.fueraGeo);
+
+        const total = alertasData.sinSalida.length + alertasData.salidasAuto.length +
+                      alertasData.tardanzas.length + alertasData.fueraGeo.length;
+
+        // ── Tarjetas ──
+        document.getElementById('cards-wrap').innerHTML = `
+          <div class="card-alerta card-rojo ${tabActiva==='sinSalida'?'activa':''}"
+               onclick="cambiarTab('sinSalida')" title="Dias sin salida registrada">
+            <div class="num">${alertasData.sinSalida.length}</div>
+            <div class="lbl">⛔ Dias sin salida</div>
+          </div>
+          <div class="card-alerta card-naranja ${tabActiva==='salidasAuto'?'activa':''}"
+               onclick="cambiarTab('salidasAuto')" title="Salidas puestas automaticamente por el sistema">
+            <div class="num">${alertasData.salidasAuto.length}</div>
+            <div class="lbl">⚠ Salidas automaticas</div>
+          </div>
+          <div class="card-alerta card-amarillo ${tabActiva==='tardanzas'?'activa':''}"
+               onclick="cambiarTab('tardanzas')" title="Tardanzas en entrada o regreso de lunch">
+            <div class="num">${alertasData.tardanzas.length}</div>
+            <div class="lbl">🕐 Tardanzas</div>
+          </div>
+          <div class="card-alerta card-geo ${tabActiva==='fueraGeo'?'activa':''}"
+               onclick="cambiarTab('fueraGeo')" title="Marcajes fuera del area de geocerca">
+            <div class="num">${alertasData.fueraGeo.length}</div>
+            <div class="lbl">📍 Fuera de geocerca</div>
+          </div>
+          <div class="card-alerta card-verde ${tabActiva==='todos'?'activa':''}"
+               onclick="cambiarTab('todos')" title="Ver todas las alertas juntas">
+            <div class="num">${total}</div>
+            <div class="lbl">📋 Total de alertas</div>
+          </div>
+        `;
+
+        document.getElementById('mensaje-carga').textContent = '';
+        document.getElementById('tabs-wrap').style.display = 'flex';
+        renderTabs();
+        renderTabla();
+
+      } catch (err) {
+        console.error(err);
+        document.getElementById('mensaje-carga').textContent =
+          '❌ Error cargando datos. Verifica tu conexion.';
+      }
+    }
+
+    // ══════════════════════════════════════════════
+    // TABS
+    // ══════════════════════════════════════════════
+    function cambiarTab(tab) {
+      tabActiva = tab;
+      // Actualizar borde activo en tarjetas
+      document.querySelectorAll('.card-alerta').forEach(c => c.classList.remove('activa'));
+      const idx = ['sinSalida','salidasAuto','tardanzas','fueraGeo','todos'].indexOf(tab);
+      const cards = document.querySelectorAll('.card-alerta');
+      if (cards[idx]) cards[idx].classList.add('activa');
+      renderTabs();
+      renderTabla();
+    }
+
+    function renderTabs() {
+      const tabs = [
+        { id: 'todos',       label: 'Todas',              count: alertasData.sinSalida.length + alertasData.salidasAuto.length + alertasData.tardanzas.length + alertasData.fueraGeo.length },
+        { id: 'sinSalida',   label: 'Sin salida',         count: alertasData.sinSalida.length   },
+        { id: 'salidasAuto', label: 'Salidas automaticas',count: alertasData.salidasAuto.length },
+        { id: 'tardanzas',   label: 'Tardanzas',          count: alertasData.tardanzas.length   },
+        { id: 'fueraGeo',    label: 'Fuera de geocerca',  count: alertasData.fueraGeo.length    },
+      ];
+      document.getElementById('tabs-wrap').innerHTML = tabs.map(t => `
+        <button class="tab ${tabActiva === t.id ? 'activo' : ''}" onclick="cambiarTab('${t.id}')">
+          ${t.label} <span class="count">${t.count}</span>
+        </button>
+      `).join('');
+    }
+
+    // ══════════════════════════════════════════════
+    // RENDERIZAR TABLA
+    // ══════════════════════════════════════════════
+    function renderTabla() {
+      let datos = [];
+      if (tabActiva === 'todos') {
+        datos = [
+          ...alertasData.sinSalida.map(r => ({...r, categoria: 'sinSalida'})),
+          ...alertasData.salidasAuto.map(r => ({...r, categoria: 'salidasAuto'})),
+          ...alertasData.tardanzas.map(r => ({...r, categoria: 'tardanzas'})),
+          ...alertasData.fueraGeo.map(r => ({...r, categoria: 'fueraGeo'})),
+        ].sort((a,b) => {
+          // Primero por urgencia: sinSalida > salidasAuto > tardanzas > fueraGeo
+          const orden = {sinSalida:0, salidasAuto:1, tardanzas:2, fueraGeo:3};
+          if (orden[a.categoria] !== orden[b.categoria])
+            return orden[a.categoria] - orden[b.categoria];
+          return a.fecha.localeCompare(b.fecha);
+        });
+      } else {
+        datos = alertasData[tabActiva].map(r => ({...r, categoria: tabActiva}));
+      }
+
+      if (!datos.length) {
+        document.getElementById('contenedor-tabla').innerHTML = `
+          <div class="sin-datos">
+            ✅ No hay alertas de este tipo en la quincena seleccionada
+          </div>`;
+        return;
+      }
+
+      const clsFila = cat =>
+        cat === 'sinSalida'   ? 'fila-rojo'
+        : cat === 'salidasAuto' ? 'fila-naranja'
+        : cat === 'tardanzas'   ? 'fila-amarillo'
+        : 'fila-geo';
+
+      const badgeHTML = cat =>
+        cat === 'sinSalida'   ? `<span class="badge badge-error">⛔ Sin salida</span>`
+        : cat === 'salidasAuto' ? `<span class="badge badge-auto">⚠ Salida automatica</span>`
+        : cat === 'tardanzas'   ? `<span class="badge badge-tard">🕐 Tardanza</span>`
+        : `<span class="badge badge-geo">📍 Fuera de geocerca</span>`;
+
+      let html = `
+        <table class="tabla-alertas">
+          <thead>
+            <tr>
+              <th>Tipo</th>
+              <th style="text-align:left;padding-left:12px;">Empleado</th>
+              <th>Departamento</th>
+              <th>Dia</th>
+              <th>Fecha</th>
+              <th>Detalle</th>
+              <th class="no-print">Accion</th>
+            </tr>
+          </thead>
+          <tbody>
+      `;
+
+      datos.forEach(r => {
+        html += `
+          <tr class="${clsFila(r.categoria)}">
+            <td>${badgeHTML(r.categoria)}</td>
+            <td style="text-align:left;padding-left:12px;">
+              <strong>${r.nombre}</strong><br>
+              <span style="font-size:11px;color:#999;">${r.usuario}</span>
+            </td>
+            <td>${r.depto}</td>
+            <td>${nombreDia(r.fecha)}</td>
+            <td>${fmtCorta(r.fecha)}</td>
+            <td style="text-align:left;color:#555;font-size:12px;">${r.detalle}</td>
+            <td class="no-print">
+              <button onclick="verReporte('${r.usuario}')"
+                class="boton pequeño" style="background:#84ae05;">Ver</button>
+              <button onclick="corregir('${r.usuario}')"
+                class="boton pequeño">Corregir</button>
+            </td>
+          </tr>
+        `;
+      });
+
+      html += `</tbody></table>`;
+      html += `<p style="text-align:center;font-size:12px;color:#999;margin:10px 0;">
+        ${datos.length} alerta${datos.length !== 1 ? 's' : ''} encontrada${datos.length !== 1 ? 's' : ''}
+      </p>`;
+
+      document.getElementById('contenedor-tabla').innerHTML = html;
+    }
+
+    function verReporte(usuario) {
+      const desde = document.getElementById('fechaDesde').value;
+      const hasta = document.getElementById('fechaHasta').value;
+      window.location.href = `reporte.html?usuario=${encodeURIComponent(usuario)}`;
+    }
+
+    function corregir(usuario) {
+      window.location.href = `corregir.html?usuario=${encodeURIComponent(usuario)}`;
+    }
+
+    // ══════════════════════════════════════════════
+    // INICIALIZACIÓN
+    // ══════════════════════════════════════════════
+    document.addEventListener('DOMContentLoaded', () => {
+      setQuincena(quincenaDeHoy());
+      cargarAlertas();
+    });
+  </script>
+  <script src="common.js"></script>
+</body>
+</html>

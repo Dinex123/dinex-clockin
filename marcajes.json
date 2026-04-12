@@ -1,1 +1,66 @@
-[]
+[
+  {
+    "usuario": "chiri",
+    "tipo": "entrada",
+    "fecha": "2026-04-12",
+    "hora": "00:26:13",
+    "ip": "127.0.0.1",
+    "departamento": "Corporativo",
+    "lat": 29.747961010527312,
+    "lng": -95.48226491843702,
+    "accuracy": 87,
+    "insideGeofence": false,
+    "geofenceId": null,
+    "geofenceName": null,
+    "distanceToCenterM": null,
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36 Edg/146.0.0.0"
+  },
+  {
+    "usuario": "chiri",
+    "tipo": "salida_lunch",
+    "fecha": "2026-04-12",
+    "hora": "00:26:20",
+    "ip": "127.0.0.1",
+    "departamento": "Corporativo",
+    "lat": 29.747961010527312,
+    "lng": -95.48226491843702,
+    "accuracy": 87,
+    "insideGeofence": false,
+    "geofenceId": null,
+    "geofenceName": null,
+    "distanceToCenterM": null,
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36 Edg/146.0.0.0"
+  },
+  {
+    "usuario": "chiri",
+    "tipo": "entrada_lunch",
+    "fecha": "2026-04-12",
+    "hora": "00:26:24",
+    "ip": "127.0.0.1",
+    "departamento": "Corporativo",
+    "lat": 29.747961010527312,
+    "lng": -95.48226491843702,
+    "accuracy": 87,
+    "insideGeofence": false,
+    "geofenceId": null,
+    "geofenceName": null,
+    "distanceToCenterM": null,
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36 Edg/146.0.0.0"
+  },
+  {
+    "usuario": "chiri",
+    "tipo": "salida",
+    "fecha": "2026-04-12",
+    "hora": "00:26:30",
+    "ip": "127.0.0.1",
+    "departamento": "Corporativo",
+    "lat": 29.747961010527312,
+    "lng": -95.48226491843702,
+    "accuracy": 87,
+    "insideGeofence": false,
+    "geofenceId": null,
+    "geofenceName": null,
+    "distanceToCenterM": null,
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36 Edg/146.0.0.0"
+  }
+]

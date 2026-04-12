@@ -8,71 +8,165 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
   <style>
+    /* ── Layout general ── */
+    .contenedor { max-width: 1200px; margin: 0 auto; padding: 20px; }
+    .logo { display: block; margin: 0 auto 10px auto; max-width: 220px; }
+    h1 { text-align: center; margin-bottom: 20px; color: #84ae05; }
+
+    /* ── Botones (mismos colores del sistema) ── */
     .boton {
-      background-color: #ec008c;
-      color: white;
-      border: none;
-      padding: 10px 20px;
-      margin: 5px;
-      border-radius: 5px;
-      cursor: pointer;
-      font-size: 14px;
+      background-color: #ec008c; color: white; border: none;
+      padding: 9px 18px; margin: 4px; border-radius: 6px;
+      cursor: pointer; font-size: 14px; text-decoration: none;
+      display: inline-block; transition: background .2s;
     }
     .boton:hover { background-color: #c60074; }
+    .boton.verde { background-color: #84ae05; }
+    .boton.verde:hover { background-color: #6a8c04; }
+    .boton.gris { background-color: #888; }
+    .boton.gris:hover { background-color: #666; }
+    .boton.pequeño { padding: 5px 12px; font-size: 12px; margin: 2px; }
 
-    .tabla-reporte {
-      width: 90%;
-      margin: 30px auto;
-      border-collapse: collapse;
-      font-size: 15px;
-      text-align: center;
-      box-shadow: 0 0 6px rgba(0, 0, 0, 0.1);
+    /* ── Buscador autocomplete ── */
+    .search-wrap { position: relative; display: inline-block; margin-right: 6px; }
+    .search-wrap input {
+      padding: 8px 12px; font-size: 14px; width: 270px;
+      border: 1px solid #ccc; border-radius: 6px; outline: none;
     }
-    .tabla-reporte th {
-      background-color: #ec008c;
-      color: white;
-      padding: 10px;
-      font-weight: bold;
+    .search-wrap input:focus { border-color: #ec008c; }
+    #listaEmpleados {
+      display: none; position: absolute; left: 0; right: 0; top: 100%;
+      background: #fff; border: 1px solid #ccc; border-top: none;
+      border-radius: 0 0 8px 8px; margin: 0; padding: 0;
+      list-style: none; z-index: 200; max-height: 230px;
+      overflow-y: auto; box-shadow: 0 4px 12px rgba(0,0,0,.14); text-align: left;
     }
-    .tabla-reporte td {
-      padding: 8px;
-      border-bottom: 1px solid #ddd;
+    #listaEmpleados li {
+      padding: 9px 14px; cursor: pointer; font-size: 13px;
+      border-bottom: 1px solid #f0f0f0;
     }
-    .tabla-reporte tr:nth-child(even) { background-color: #fdf4fb; }
-    .tabla-reporte tr:hover { background-color: #fae6f4; }
+    #listaEmpleados li:hover { background: #fdf0f8; }
 
-    .contenedor { max-width: 1100px; margin: auto; padding: 20px; }
-    .logo { display: block; margin: 0 auto 10px auto; max-width: 220px; }
-    h1 { text-align: center; margin-bottom: 20px; color: #88a800; }
-
-    input[type="text"] {
-      padding: 6px 10px; border: 1px solid #ccc; border-radius: 4px;
-      font-size: 14px; margin-right: 10px;
+    /* ── Selector de quincena ── */
+    .quincena-wrap {
+      display: flex; justify-content: center; align-items: center;
+      gap: 8px; flex-wrap: wrap; margin: 12px 0;
+      padding: 12px 16px; background: #fafafa;
+      border: 1px solid #e8e8e8; border-radius: 8px;
     }
-    #mensaje-reporte {
-      text-align: center; font-weight: bold; color: red; margin-top: 10px;
+    .quincena-wrap label { font-size: 13px; color: #555; font-weight: 600; }
+    .quincena-wrap input[type="date"] {
+      padding: 6px 10px; font-size: 13px;
+      border: 1px solid #ccc; border-radius: 6px; color: #333;
+    }
+    .quincena-wrap input[type="date"]:focus { border-color: #ec008c; outline: none; }
+    .quincena-wrap .sep { font-size: 13px; color: #888; }
+    #info-quincena {
+      text-align: center; font-size: 12px; color: #84ae05;
+      font-weight: 600; margin: 4px 0 10px; min-height: 16px;
     }
 
-    /* 🔴 Resaltado para fuera de geocerca */
-    .fuera-geo { background: #ffe6e6; }
-    .fuera-geo:hover { background: #ffd6d6; }
-
-    .resumen-geo {
-      width: 90%; margin: 10px auto 0 auto;
-      display: flex; gap: 10px; align-items: center; justify-content: flex-start; font-size: 14px;
+    /* ── Resumen de chips (geocerca) ── */
+    .resumen-chips {
+      display: flex; gap: 8px; flex-wrap: wrap;
+      justify-content: center; margin: 10px 0 14px;
     }
     .chip {
-      display: inline-block; padding: 6px 10px; border-radius: 999px; font-weight: 600;
-      border: 1px solid transparent;
+      display: inline-block; padding: 5px 12px; border-radius: 999px;
+      font-size: 13px; font-weight: 600; border: 1px solid transparent;
     }
-    .chip.ok { background: #e7f7e7; color: #167c16; border-color: #bfe6bf; }
-    .chip.warn { background: #ffe6e6; color: #b01919; border-color: #ffc2c2; }
-    .chip.neutral { background: #eef2f7; color: #3c4758; border-color: #d8dee6; }
+    .chip.ok    { background: #e7f7e7; color: #167c16; border-color: #bfe6bf; }
+    .chip.warn  { background: #fff3e0; color: #b45309; border-color: #fcd49a; }
+    .chip.error { background: #ffe6e6; color: #b01919; border-color: #ffc2c2; }
+    .chip.info  { background: #eef2f7; color: #3c4758; border-color: #d8dee6; }
+
+    /* ── Tabla principal por días ── */
+    .tabla-dias {
+      width: 100%; border-collapse: collapse;
+      font-size: 13px; margin-top: 16px;
+      box-shadow: 0 0 6px rgba(0,0,0,.08);
+    }
+    .tabla-dias th {
+      background: #ec008c; color: white;
+      padding: 10px 8px; font-weight: bold; text-align: center;
+      white-space: nowrap;
+    }
+    .tabla-dias td {
+      padding: 8px; border-bottom: 1px solid #eee;
+      text-align: center; vertical-align: middle;
+    }
+    .tabla-dias tr:hover td { background: #fef0f8; }
+
+    /* ── Colores de fila por estado ── */
+    .fila-ok       { background: #ffffff; }
+    .fila-warning  { background: #fffbf0; }
+    .fila-error    { background: #fff5f5; }
+    .fila-auto     { background: #fff8ee; }
+
+    /* ── Badges de alerta ── */
+    .badge {
+      display: inline-block; font-size: 10px; padding: 2px 7px;
+      border-radius: 4px; font-weight: 600; margin: 2px;
+      white-space: nowrap;
+    }
+    .badge-ok     { background: #e7f7e7; color: #167c16; }
+    .badge-warn   { background: #fff3e0; color: #b45309; }
+    .badge-error  { background: #ffe6e6; color: #b01919; }
+    .badge-auto   { background: #fff0d0; color: #7c4a00; }
+    .badge-geo    { background: #ffe0f0; color: #8b0050; }
+
+    /* ── Hora con color por estado ── */
+    .hora-normal  { color: #333; }
+    .hora-tarde   { color: #b45309; font-weight: 600; }
+    .hora-auto    { color: #b45309; font-style: italic; }
+    .hora-falta   { color: #aaa; }
+
+    /* ── Fila de totales ── */
+    .fila-total td {
+      background: #f5f5f5; font-weight: bold;
+      border-top: 2px solid #ec008c; color: #333;
+    }
+
+    /* ── Leyenda ── */
+    .leyenda {
+      display: flex; gap: 16px; flex-wrap: wrap;
+      justify-content: center; margin: 12px 0;
+      font-size: 12px; color: #555;
+    }
+    .leyenda-item { display: flex; align-items: center; gap: 5px; }
+    .leyenda-color {
+      width: 14px; height: 14px; border-radius: 3px; display: inline-block;
+    }
+
+    /* ── Mensaje ── */
+    #mensaje-reporte {
+      text-align: center; font-weight: bold; color: red; margin: 10px 0;
+    }
+
+    /* ── Empleado seleccionado ── */
+    #empleado-seleccionado {
+      text-align: center; font-size: 13px; color: #555;
+      margin: 6px 0; min-height: 18px;
+    }
+
+    /* ── Resumen total horas ── */
+    .resumen-horas {
+      text-align: center; margin: 16px 0;
+      font-size: 16px; font-weight: bold; color: #333;
+    }
+    .resumen-horas span { color: #ec008c; font-size: 20px; }
+
+    /* ── Print ── */
+    @media print {
+      .no-print { display: none !important; }
+      .tabla-dias { font-size: 11px; }
+    }
   </style>
 </head>
 <body>
+
+  <!-- Guard de sesión -->
   <script>
-    // Guard de sesión admin - redirige si no hay credenciales
     (function() {
       if (!sessionStorage.getItem('adminUser')) {
         window.location.replace('admin-login.html');
@@ -84,65 +178,175 @@
     <img src="logo-dinex.png" alt="Logo DinEX" class="logo">
     <h1>Reporte de Horas por Empleado</h1>
 
-    <div style="margin-bottom:16px; display:flex; flex-wrap:wrap; gap:8px; justify-content:center; align-items:center;">
-      <div style="position:relative;">
+    <!-- ── Buscador de empleado ── -->
+    <div style="text-align:center; margin-bottom:10px;">
+      <div class="search-wrap">
         <input type="text" id="usuarioBusca" placeholder="Buscar por nombre o usuario..."
-          autocomplete="off"
-          style="padding:8px 12px; font-size:14px; width:260px; border:1px solid #ccc; border-radius:6px;"
-          oninput="filtrarEmpleados()" onkeydown="teclaEmpleados(event)">
-        <ul id="listaEmpleados" style="display:none; position:absolute; left:0; right:0; top:100%;
-          background:#fff; border:1px solid #ccc; border-top:none; border-radius:0 0 6px 6px;
-          margin:0; padding:0; list-style:none; z-index:100; max-height:220px; overflow-y:auto;
-          box-shadow:0 4px 10px rgba(0,0,0,.12); text-align:left;"></ul>
+          autocomplete="off" oninput="filtrarEmpleados()" onkeydown="teclaEmpleados(event)">
+        <ul id="listaEmpleados"></ul>
       </div>
       <input type="hidden" id="usuario">
       <button onclick="cargarReporte()" class="boton">Ver Reporte</button>
-      <button onclick="exportarExcel()" class="boton">Exportar a Excel</button>
-      <button onclick="exportarPDF()" class="boton">Exportar a PDF</button>
+      <button onclick="exportarExcel()" class="boton verde no-print">Exportar Excel</button>
+      <button onclick="exportarPDF()" class="boton verde no-print">Exportar PDF</button>
+      <button onclick="window.print()" class="boton gris no-print">Imprimir</button>
     </div>
-    <div id="empleadoSeleccionado" style="text-align:center; font-size:13px; color:#666; margin-bottom:4px; min-height:18px;"></div>
+    <div id="empleado-seleccionado"></div>
 
+    <!-- ── Selector de quincena ── -->
+    <div class="quincena-wrap no-print">
+      <label>📅 Desde:</label>
+      <input type="date" id="fechaDesde">
+      <span class="sep">→</span>
+      <label>Hasta:</label>
+      <input type="date" id="fechaHasta">
+      <button onclick="aplicarFiltro()" class="boton" style="font-size:13px;padding:6px 14px;">Filtrar</button>
+      <button onclick="quincenaAnterior()" class="boton gris" style="font-size:12px;padding:6px 12px;">◀ Quincena anterior</button>
+      <button onclick="quincenaSiguiente()" class="boton gris" style="font-size:12px;padding:6px 12px;">Quincena siguiente ▶</button>
+    </div>
+    <div id="info-quincena"></div>
+
+    <!-- ── Mensaje de error ── -->
     <p id="mensaje-reporte"></p>
 
-    <div id="resultado" style="margin-top: 20px;"></div>
+    <!-- ── Contenedor de resultado ── -->
+    <div id="resultado"></div>
+
     <br>
-    <a href="admin.html" class="boton">Volver al Panel</a>
+    <div class="no-print" style="text-align:center;">
+      <a href="admin.html" class="boton gris">← Volver al Panel</a>
+    </div>
   </div>
 
   <script>
-    let datosGlobal = [];
-    let totalHorasStr = '';
-    let empleadosActivos = [];
+    // ══════════════════════════════════════════════
+    // VARIABLES GLOBALES
+    // ══════════════════════════════════════════════
+    let datosGlobal      = [];   // todos los registros del empleado
+    let empleadosActivos = [];   // lista para el autocomplete
+    let nombreEmpleado   = '';   // nombre completo para exportar
 
-    // Cargar empleados activos al abrir la página
-    async function cargarEmpleadosActivos() {
+    // ══════════════════════════════════════════════
+    // LÓGICA DE QUINCENAS (Sábado → Viernes, 14 días)
+    // Anclada al 21 de Marzo 2026 (sábado conocido)
+    // ══════════════════════════════════════════════
+    const ANCHOR = new Date(2026, 2, 21); // 21 Mar 2026 — sábado de referencia
+
+    function quincenaDeHoy() {
+      const hoy     = new Date();
+      hoy.setHours(0, 0, 0, 0);
+      const diffMs  = hoy - ANCHOR;
+      const diffDia = Math.floor(diffMs / 86400000);
+      const ciclo   = Math.floor(diffDia / 14);
+      const inicio  = new Date(ANCHOR);
+      inicio.setDate(ANCHOR.getDate() + ciclo * 14);
+      const fin = new Date(inicio);
+      fin.setDate(inicio.getDate() + 13);
+      return { inicio, fin };
+    }
+
+    function quincenaDesdeFecha(fecha) {
+      // Dado un Date, devuelve el inicio de su quincena
+      fecha.setHours(0, 0, 0, 0);
+      const diffMs  = fecha - ANCHOR;
+      const diffDia = Math.floor(diffMs / 86400000);
+      const ciclo   = Math.floor(diffDia / 14);
+      const inicio  = new Date(ANCHOR);
+      inicio.setDate(ANCHOR.getDate() + ciclo * 14);
+      const fin = new Date(inicio);
+      fin.setDate(inicio.getDate() + 13);
+      return { inicio, fin };
+    }
+
+    function fmtISO(d) {
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const dia = String(d.getDate()).padStart(2, '0');
+      return `${y}-${m}-${dia}`;
+    }
+
+    function fmtCorta(iso) {
+      if (!iso || !iso.includes('-')) return '';
+      const [y, m, d] = iso.split('-');
+      return `${m}/${d}/${y}`;
+    }
+
+    function nombreDia(iso) {
+      if (!iso) return '';
+      const dias = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
+      const [y, m, d] = iso.split('-').map(Number);
+      return dias[new Date(y, m - 1, d).getDay()];
+    }
+
+    function setQuincena(q) {
+      document.getElementById('fechaDesde').value = fmtISO(q.inicio);
+      document.getElementById('fechaHasta').value = fmtISO(q.fin);
+      actualizarInfoQuincena();
+    }
+
+    function actualizarInfoQuincena() {
+      const desde = document.getElementById('fechaDesde').value;
+      const hasta = document.getElementById('fechaHasta').value;
+      if (!desde || !hasta) { document.getElementById('info-quincena').textContent = ''; return; }
+      document.getElementById('info-quincena').textContent =
+        `📅 Quincena: ${fmtCorta(desde)} → ${fmtCorta(hasta)}`;
+    }
+
+    function quincenaAnterior() {
+      const desdeActual = document.getElementById('fechaDesde').value;
+      if (!desdeActual) return;
+      const d = new Date(desdeActual + 'T12:00:00');
+      d.setDate(d.getDate() - 14);
+      const q = quincenaDesdeFecha(d);
+      setQuincena(q);
+      if (document.getElementById('usuario').value) cargarReporte();
+    }
+
+    function quincenaSiguiente() {
+      const hastaActual = document.getElementById('fechaHasta').value;
+      if (!hastaActual) return;
+      const d = new Date(hastaActual + 'T12:00:00');
+      d.setDate(d.getDate() + 1);
+      const q = quincenaDesdeFecha(d);
+      setQuincena(q);
+      if (document.getElementById('usuario').value) cargarReporte();
+    }
+
+    function aplicarFiltro() {
+      const desde = document.getElementById('fechaDesde').value;
+      const hasta = document.getElementById('fechaHasta').value;
+      if (!desde || !hasta) { alert('Selecciona ambas fechas.'); return; }
+      if (desde > hasta) { alert('La fecha "Desde" no puede ser mayor que "Hasta".'); return; }
+      actualizarInfoQuincena();
+      if (document.getElementById('usuario').value) cargarReporte();
+    }
+
+    // ══════════════════════════════════════════════
+    // AUTOCOMPLETE DE EMPLEADOS
+    // ══════════════════════════════════════════════
+    async function cargarEmpleados() {
       try {
         const res = await fetch('/api/empleados');
         empleadosActivos = await res.json();
-      } catch(e) { console.error('Error cargando empleados:', e); }
+      } catch (e) { console.error('Error cargando empleados:', e); }
     }
-    cargarEmpleadosActivos();
 
     function filtrarEmpleados() {
-      const q = document.getElementById('usuarioBusca').value.toLowerCase().trim();
+      const q  = document.getElementById('usuarioBusca').value.toLowerCase().trim();
       const ul = document.getElementById('listaEmpleados');
       ul.innerHTML = '';
       document.getElementById('usuario').value = '';
-      document.getElementById('empleadoSeleccionado').textContent = '';
-
+      document.getElementById('empleado-seleccionado').textContent = '';
       if (!q) { ul.style.display = 'none'; return; }
       const matches = empleadosActivos.filter(u =>
         u.usuario.toLowerCase().includes(q) ||
         (u.nombre || '').toLowerCase().includes(q)
       ).slice(0, 10);
-
       if (!matches.length) { ul.style.display = 'none'; return; }
       matches.forEach(u => {
         const li = document.createElement('li');
-        li.style.cssText = 'padding:9px 14px; cursor:pointer; font-size:13px; border-bottom:1px solid #f0f0f0;';
-        li.innerHTML = `<strong style="font-size:13px;">${u.nombre || u.usuario}</strong> <span style="color:#999; font-size:12px;">(${u.usuario}) — ${u.departamento || ''}</span>`;
-        li.onmouseenter = () => li.style.background = '#f7f7f7';
-        li.onmouseleave = () => li.style.background = '';
+        li.innerHTML = `<strong>${u.nombre || u.usuario}</strong>
+          <span style="color:#999;font-size:12px;"> (${u.usuario}) — ${u.departamento || ''}</span>`;
         li.onclick = () => seleccionarEmpleado(u);
         ul.appendChild(li);
       });
@@ -150,31 +354,32 @@
     }
 
     function seleccionarEmpleado(u) {
-      document.getElementById('usuarioBusca').value = u.nombre || u.usuario;
-      document.getElementById('usuario').value = u.usuario;
+      document.getElementById('usuarioBusca').value  = u.nombre || u.usuario;
+      document.getElementById('usuario').value       = u.usuario;
       document.getElementById('listaEmpleados').style.display = 'none';
-      document.getElementById('empleadoSeleccionado').textContent =
-        `Empleado seleccionado: ${u.nombre || u.usuario} — ${u.departamento || ''}`;
+      document.getElementById('empleado-seleccionado').textContent =
+        `Empleado: ${u.nombre || u.usuario} — ${u.departamento || ''}`;
+      nombreEmpleado = u.nombre || u.usuario;
       cargarReporte();
     }
 
     function teclaEmpleados(e) {
-      const ul = document.getElementById('listaEmpleados');
+      const ul    = document.getElementById('listaEmpleados');
       const items = ul.querySelectorAll('li');
-      const activo = ul.querySelector('li.sel');
+      const act   = ul.querySelector('li.sel');
       if (e.key === 'ArrowDown') {
         e.preventDefault();
-        const next = activo ? activo.nextElementSibling : items[0];
-        if (activo) { activo.classList.remove('sel'); activo.style.background = ''; }
-        if (next) { next.classList.add('sel'); next.style.background = '#e8f5e9'; }
+        const next = act ? act.nextElementSibling : items[0];
+        if (act) { act.classList.remove('sel'); act.style.background = ''; }
+        if (next) { next.classList.add('sel'); next.style.background = '#fdf0f8'; }
       } else if (e.key === 'ArrowUp') {
         e.preventDefault();
-        const prev = activo ? activo.previousElementSibling : items[items.length-1];
-        if (activo) { activo.classList.remove('sel'); activo.style.background = ''; }
-        if (prev) { prev.classList.add('sel'); prev.style.background = '#e8f5e9'; }
+        const prev = act ? act.previousElementSibling : items[items.length - 1];
+        if (act) { act.classList.remove('sel'); act.style.background = ''; }
+        if (prev) { prev.classList.add('sel'); prev.style.background = '#fdf0f8'; }
       } else if (e.key === 'Enter') {
         e.preventDefault();
-        if (activo) activo.click();
+        if (act) act.click();
         else if (document.getElementById('usuario').value) cargarReporte();
       } else if (e.key === 'Escape') {
         ul.style.display = 'none';
@@ -187,201 +392,469 @@
       }
     });
 
-    function fmtFecha(iso) {
-      if (!iso || !iso.includes('-')) return '';
-      const [y, m, d] = iso.split('-');
-      return `${m}/${d}/${y}`;
+    // ══════════════════════════════════════════════
+    // CARGA Y PROCESAMIENTO DEL REPORTE
+    // ══════════════════════════════════════════════
+    async function cargarReporte() {
+      const usuario = document.getElementById('usuario').value.trim();
+      const mensaje = document.getElementById('mensaje-reporte');
+      const cont    = document.getElementById('resultado');
+      mensaje.textContent = '';
+      cont.innerHTML = '';
+
+      if (!usuario) { mensaje.textContent = '⚠️ Selecciona un empleado.'; return; }
+
+      try {
+        const res  = await fetch('/api/reporte?usuario=' + encodeURIComponent(usuario));
+        const raw  = await res.json().catch(() => []);
+
+        if (!raw.length) {
+          mensaje.textContent = '❌ No se encontraron registros para este empleado.';
+          return;
+        }
+
+        // Filtrar por rango de fechas seleccionado
+        const desde = document.getElementById('fechaDesde').value;
+        const hasta = document.getElementById('fechaHasta').value;
+        const data  = raw
+          .filter(r => {
+            if (desde && r.fecha < desde) return false;
+            if (hasta && r.fecha > hasta) return false;
+            return true;
+          })
+          .sort((a, b) => {
+            if (a.fecha !== b.fecha) return a.fecha.localeCompare(b.fecha);
+            return (a.hora || '').localeCompare(b.hora || '');
+          });
+
+        datosGlobal = data;
+
+        if (!data.length) {
+          mensaje.textContent = '❌ No hay registros en el rango de fechas seleccionado.';
+          return;
+        }
+
+        // Agrupar por día
+        const porDia = {};
+        data.forEach(r => {
+          if (!porDia[r.fecha]) porDia[r.fecha] = [];
+          porDia[r.fecha].push(r);
+        });
+
+        // Calcular alertas y totales
+        let totalMs         = 0;
+        let diasTrabajados  = 0;
+        let diasConError    = 0;
+        let totalSalidasAuto = 0;
+        let totalFueraGeo   = 0;
+
+        const filasDias = [];
+
+        Object.keys(porDia).sort().forEach(fecha => {
+          const regs = porDia[fecha];
+
+          const get = tipo => regs.find(r => r.tipo === tipo) || null;
+          const entrada      = get('entrada');
+          const salidaLunch  = get('salida_lunch');
+          const entradaLunch = get('entrada_lunch');
+          const salida       = get('salida');
+
+          // ── Detección de alertas ──
+          const alertas = [];
+
+          // Día incompleto (tiene entrada pero no salida)
+          if (entrada && !salida) {
+            alertas.push({ tipo: 'error', texto: 'Sin salida' });
+          }
+
+          // Salida automática
+          const esAuto = salida && (salida.auto === 1 || salida.auto === true);
+          if (esAuto) {
+            alertas.push({ tipo: 'auto', texto: 'Salida automática' });
+            totalSalidasAuto++;
+          }
+
+          // Tardanza en entrada (después de 09:35)
+          if (entrada && (entrada.hora || '') > '09:35:00') {
+            const [hh, mm] = (entrada.hora || '00:00').split(':').map(Number);
+            const mins = (hh * 60 + mm) - (9 * 60 + 35);
+            alertas.push({ tipo: 'warn', texto: `Tardanza ${mins}min` });
+          }
+
+          // Tardanza en regreso de lunch (después de 14:05)
+          if (entradaLunch && (entradaLunch.hora || '') > '14:05:00') {
+            const [hh, mm] = (entradaLunch.hora || '00:00').split(':').map(Number);
+            const mins = (hh * 60 + mm) - (14 * 60 + 5);
+            alertas.push({ tipo: 'warn', texto: `Tarde lunch ${mins}min` });
+          }
+
+          // Marcaje fuera de geocerca
+          const fueraGeo = regs.some(r => r.insideGeofence === false || r.insideGeofence === 0);
+          if (fueraGeo) {
+            alertas.push({ tipo: 'geo', texto: 'Fuera de geocerca' });
+            totalFueraGeo++;
+          }
+
+          // ── Calcular horas del día (entrada → salida, sin descuentos) ──
+          let horasDia = null;
+          let horasDiaMs = 0;
+          if (entrada && salida) {
+            const ini = new Date(`${fecha}T${(entrada.hora || '').slice(0,5)}:00`);
+            const fin = new Date(`${fecha}T${(salida.hora  || '').slice(0,5)}:00`);
+            if (!isNaN(ini) && !isNaN(fin) && fin > ini) {
+              horasDiaMs = fin - ini;
+              totalMs += horasDiaMs;
+              diasTrabajados++;
+            }
+          }
+
+          if (alertas.some(a => a.tipo === 'error')) diasConError++;
+
+          // ── Formatear hora para mostrar ──
+          const fmtH = (reg, esTarde, esAutoFlag) => {
+            if (!reg) return `<span class="hora-falta">—</span>`;
+            const h = (reg.hora || '').slice(0, 5);
+            if (esAutoFlag) return `<span class="hora-auto">${h}*</span>`;
+            if (esTarde)    return `<span class="hora-tarde">${h}</span>`;
+            return `<span class="hora-normal">${h}</span>`;
+          };
+
+          const tardanzaEntrada = entrada && (entrada.hora || '') > '09:35:00';
+          const tardanzaLunch   = entradaLunch && (entradaLunch.hora || '') > '14:05:00';
+
+          // ── Determinar clase de fila ──
+          let claseFila = 'fila-ok';
+          if (alertas.some(a => a.tipo === 'error'))  claseFila = 'fila-error';
+          else if (esAuto)                             claseFila = 'fila-auto';
+          else if (alertas.length > 0)                claseFila = 'fila-warning';
+
+          // ── Total de horas formateado ──
+          let horasTexto = '—';
+          if (horasDiaMs > 0) {
+            const h = Math.floor(horasDiaMs / 3600000);
+            const m = Math.floor((horasDiaMs % 3600000) / 60000);
+            horasTexto = `${h}h ${String(m).padStart(2,'0')}m`;
+          }
+
+          // ── Badges de alerta ──
+          const badgesHTML = alertas.length === 0
+            ? `<span class="badge badge-ok">✓ Sin errores</span>`
+            : alertas.map(a => {
+                const cls = a.tipo === 'error' ? 'badge-error'
+                          : a.tipo === 'auto'  ? 'badge-auto'
+                          : a.tipo === 'geo'   ? 'badge-geo'
+                          : 'badge-warn';
+                return `<span class="badge ${cls}">${a.texto}</span>`;
+              }).join('');
+
+          filasDias.push({
+            fecha, claseFila, entrada, salidaLunch, entradaLunch, salida,
+            tardanzaEntrada, tardanzaLunch, esAuto, horasTexto, badgesHTML, alertas
+          });
+        });
+
+        // ── Total general de horas ──
+        const hTotal = Math.floor(totalMs / 3600000);
+        const mTotal = Math.floor((totalMs % 3600000) / 60000);
+        const totalHorasStr = `${hTotal}h ${String(mTotal).padStart(2,'0')}m`;
+
+        // ── Chips de resumen ──
+        const resumenHTML = `
+          <div class="resumen-chips">
+            <span class="chip info">📋 ${diasTrabajados} días trabajados</span>
+            ${diasConError    ? `<span class="chip error">⛔ ${diasConError} días incompletos</span>` : ''}
+            ${totalSalidasAuto? `<span class="chip warn">⚠️ ${totalSalidasAuto} salidas automáticas</span>` : ''}
+            ${totalFueraGeo   ? `<span class="chip warn">📍 ${totalFueraGeo} días fuera de geocerca</span>` : ''}
+            ${diasConError === 0 && totalSalidasAuto === 0 && totalFueraGeo === 0 ? `<span class="chip ok">✓ Quincena sin errores</span>` : ''}
+          </div>
+        `;
+
+        // ── Leyenda ──
+        const leyendaHTML = `
+          <div class="leyenda no-print">
+            <span class="leyenda-item"><span class="leyenda-color" style="background:#ffffff;border:1px solid #ccc"></span> Día normal</span>
+            <span class="leyenda-item"><span class="leyenda-color" style="background:#fffbf0"></span> Con advertencia</span>
+            <span class="leyenda-item"><span class="leyenda-color" style="background:#fff8ee"></span> Salida automática</span>
+            <span class="leyenda-item"><span class="leyenda-color" style="background:#fff5f5"></span> Día incompleto</span>
+            <span class="leyenda-item" style="color:#b45309;">* hora automática asignada por el sistema</span>
+          </div>
+        `;
+
+        // ── Tabla ──
+        let tablaHTML = `
+          <table class="tabla-dias">
+            <thead>
+              <tr>
+                <th>Día</th>
+                <th>Fecha</th>
+                <th>Entrada</th>
+                <th>Salida Lunch</th>
+                <th>Regreso Lunch</th>
+                <th>Salida</th>
+                <th>Total Horas</th>
+                <th>Alertas</th>
+                <th class="no-print">Acción</th>
+              </tr>
+            </thead>
+            <tbody>
+        `;
+
+        filasDias.forEach(f => {
+          const corrLink = `corregir.html?usuario=${encodeURIComponent(document.getElementById('usuario').value)}`;
+          const accionHTML = f.alertas.length > 0
+            ? `<button onclick="window.location='${corrLink}'" class="boton pequeño">Corregir</button>`
+            : `<button onclick="window.location='${corrLink}'" class="boton pequeño gris">Ver</button>`;
+
+          tablaHTML += `
+            <tr class="${f.claseFila}">
+              <td><strong>${nombreDia(f.fecha)}</strong></td>
+              <td>${fmtCorta(f.fecha)}</td>
+              <td>${f.entrada
+                    ? `<span class="${f.tardanzaEntrada ? 'hora-tarde' : 'hora-normal'}">${(f.entrada.hora||'').slice(0,5)}</span>`
+                    : `<span class="hora-falta">—</span>`}</td>
+              <td>${f.salidaLunch
+                    ? `<span class="hora-normal">${(f.salidaLunch.hora||'').slice(0,5)}</span>`
+                    : `<span class="hora-falta">—</span>`}</td>
+              <td>${f.entradaLunch
+                    ? `<span class="${f.tardanzaLunch ? 'hora-tarde' : 'hora-normal'}">${(f.entradaLunch.hora||'').slice(0,5)}</span>`
+                    : `<span class="hora-falta">—</span>`}</td>
+              <td>${f.salida
+                    ? `<span class="${f.esAuto ? 'hora-auto' : 'hora-normal'}">${(f.salida.hora||'').slice(0,5)}${f.esAuto ? '*' : ''}</span>`
+                    : `<span class="hora-falta">—</span>`}</td>
+              <td><strong>${f.horasTexto}</strong></td>
+              <td style="text-align:left;">${f.badgesHTML}</td>
+              <td class="no-print">${accionHTML}</td>
+            </tr>
+          `;
+        });
+
+        // Fila de total
+        tablaHTML += `
+            <tr class="fila-total">
+              <td colspan="6" style="text-align:right;">TOTAL DE HORAS:</td>
+              <td>${totalHorasStr}</td>
+              <td colspan="2"></td>
+            </tr>
+          </tbody>
+        </table>`;
+
+        // ── Resumen de horas debajo ──
+        const resumenHorasHTML = `
+          <div class="resumen-horas">
+            Total de horas trabajadas: <span>${totalHorasStr}</span>
+            &nbsp;|&nbsp; ${diasTrabajados} día${diasTrabajados !== 1 ? 's' : ''} con registro
+          </div>
+        `;
+
+        cont.innerHTML = resumenHTML + leyendaHTML + tablaHTML + resumenHorasHTML;
+
+      } catch (e) {
+        console.error('Error cargando reporte:', e);
+        document.getElementById('mensaje-reporte').textContent = '❌ Error de conexión con el servidor.';
+      }
     }
 
-    async function cargarReporte() {
-      const usuario = (document.getElementById("usuario").value || document.getElementById("usuarioBusca").value).trim();
-      const mensaje = document.getElementById("mensaje-reporte");
-      const cont = document.getElementById("resultado");
+    // ══════════════════════════════════════════════
+    // EXPORTAR EXCEL
+    // ══════════════════════════════════════════════
+    function exportarExcel() {
+      if (!datosGlobal.length) { alert('Primero carga un reporte.'); return; }
 
-      mensaje.textContent = "";
-      cont.innerHTML = "";
+      const usuario  = document.getElementById('usuario').value;
+      const desde    = document.getElementById('fechaDesde').value;
+      const hasta    = document.getElementById('fechaHasta').value;
 
-      if (!usuario) {
-        mensaje.textContent = "⚠️ Ingresa un usuario válido.";
-        return;
-      }
-
-      const res = await fetch("/api/reporte?usuario=" + encodeURIComponent(usuario));
-      const raw = await res.json().catch(() => []);
-
-      if (!raw.length) {
-        mensaje.textContent = "❌ No se encontraron registros para este usuario.";
-        return;
-      }
-
-      const data = raw.sort((a, b) => {
-        if (a.fecha !== b.fecha) return (a.fecha || '').localeCompare(b.fecha || '');
-        return (a.hora || '').localeCompare(b.hora || '');
+      // Agrupar por día igual que en la tabla
+      const porDia = {};
+      datosGlobal.forEach(r => {
+        if (!porDia[r.fecha]) porDia[r.fecha] = [];
+        porDia[r.fecha].push(r);
       });
-
-      datosGlobal = data;
-
-      // —— Resumen geocerca
-      const dentro = data.filter(r => r.insideGeofence === true).length;
-      const fuera  = data.filter(r => r.insideGeofence === false).length;
-      const sinDato = data.filter(r => r.insideGeofence !== true && r.insideGeofence !== false).length;
-
-      const resumen = `
-        <div class="resumen-geo">
-          <span class="chip ok">✔ Dentro de rango: ${dentro}</span>
-          <span class="chip warn">⚠ Fuera de rango: ${fuera}</span>
-          ${sinDato ? `<span class="chip neutral">Sin dato: ${sinDato}</span>` : ``}
-        </div>
-      `;
-
-      // —— Tabla
-      let tabla = `
-        <table class="tabla-reporte">
-          <tr>
-            <th>Acción</th>
-            <th>Fecha</th>
-            <th>Hora</th>
-            <th>Departamento</th>
-            <th>Geocerca</th>
-          </tr>
-      `;
-
-      data.forEach(r => {
-        const esAutomatica = r.tipo === "salida" && r.auto === true;
-        const tipoTexto = esAutomatica ? "salida (automática)" : (r.tipo || '');
-        const estadoGeo =
-          r.insideGeofence === true ? 'Dentro de rango' :
-          r.insideGeofence === false ? 'Fuera de rango' : '-';
-
-        tabla += `
-          <tr class="${r.insideGeofence === false ? 'fuera-geo' : ''}">
-            <td>${tipoTexto}</td>
-            <td>${fmtFecha(r.fecha)}</td>
-            <td>${r.hora || ''}</td>
-            <td>${r.departamento || ''}</td>
-            <td>${estadoGeo}</td>
-          </tr>
-        `;
-      });
-
-      tabla += `</table><br>`;
-
-      // —— Total de horas por días (entrada más temprana a salida más tardía)
-      const porDia = data.reduce((acc, r) => {
-        if (!r.fecha) return acc;
-        acc[r.fecha] = acc[r.fecha] || [];
-        acc[r.fecha].push(r);
-        return acc;
-      }, {});
 
       let totalMs = 0;
-      Object.entries(porDia).forEach(([fecha, regs]) => {
-        const entradas = regs.filter(x => x.tipo === 'entrada').sort((a,b) => (a.hora || '').localeCompare(b.hora || ''));
-        const salidas  = regs.filter(x => x.tipo === 'salida').sort((a,b) => (a.hora || '').localeCompare(b.hora || ''));
-        if (entradas.length && salidas.length) {
-          // Ignorar segundos: tomar solo HH:MM para evitar decimales por segundos acumulados
-          const horaIni = (entradas[0].hora || '').slice(0, 5);
-          const horaFin = (salidas[salidas.length-1].hora || '').slice(0, 5);
-          const inicio = new Date(`${fecha}T${horaIni}:00`);
-          const fin    = new Date(`${fecha}T${horaFin}:00`);
-          if (!isNaN(inicio) && !isNaN(fin) && fin > inicio) {
-            totalMs += (fin - inicio);
+      const rows = [];
+
+      Object.keys(porDia).sort().forEach(fecha => {
+        const regs = porDia[fecha];
+        const get  = tipo => regs.find(r => r.tipo === tipo) || null;
+        const entrada      = get('entrada');
+        const salidaLunch  = get('salida_lunch');
+        const entradaLunch = get('entrada_lunch');
+        const salida       = get('salida');
+        const esAuto       = salida && (salida.auto === 1 || salida.auto === true);
+
+        let horasTexto = '—';
+        if (entrada && salida) {
+          const ini = new Date(`${fecha}T${(entrada.hora||'').slice(0,5)}:00`);
+          const fin = new Date(`${fecha}T${(salida.hora ||'').slice(0,5)}:00`);
+          if (!isNaN(ini) && !isNaN(fin) && fin > ini) {
+            const ms = fin - ini;
+            totalMs += ms;
+            const h  = Math.floor(ms / 3600000);
+            const m  = Math.floor((ms % 3600000) / 60000);
+            horasTexto = `${h}h ${String(m).padStart(2,'0')}m`;
           }
         }
+
+        const alertas = [];
+        if (entrada && !salida) alertas.push('Sin salida');
+        if (esAuto)             alertas.push('Salida automática');
+        if (entrada && (entrada.hora||'') > '09:35:00') alertas.push('Tardanza entrada');
+        if (entradaLunch && (entradaLunch.hora||'') > '14:05:00') alertas.push('Tardanza lunch');
+        if (regs.some(r => r.insideGeofence === false || r.insideGeofence === 0)) alertas.push('Fuera de geocerca');
+
+        rows.push({
+          'Día':            nombreDia(fecha),
+          'Fecha':          fmtCorta(fecha),
+          'Entrada':        entrada      ? (entrada.hora      ||'').slice(0,5) : '—',
+          'Salida Lunch':   salidaLunch  ? (salidaLunch.hora  ||'').slice(0,5) : '—',
+          'Regreso Lunch':  entradaLunch ? (entradaLunch.hora ||'').slice(0,5) : '—',
+          'Salida':         salida       ? `${(salida.hora||'').slice(0,5)}${esAuto ? ' (auto)' : ''}` : '—',
+          'Total Horas':    horasTexto,
+          'Alertas':        alertas.join(', ') || 'Sin errores'
+        });
       });
 
-      const horas   = Math.floor(totalMs / 3600000);
-      const minutos = Math.floor((totalMs % 3600000) / 60000);
-      totalHorasStr = `${horas}h ${minutos}m`;
-
-      const totalHTML = `<p style="text-align:center; font-weight:bold;">Total de horas trabajadas: ${totalHorasStr}</p>`;
-
-      cont.innerHTML = resumen + tabla + totalHTML;
-    }
-
-    function exportarExcel() {
-      if (!datosGlobal.length) {
-        alert("Primero debe cargar un reporte.");
-        return;
-      }
-      const rows = datosGlobal.map(d => {
-        const tipoTexto = d.tipo === "salida" && d.auto === true ? "salida (automática)" : (d.tipo || '');
-        const estadoGeo =
-          d.insideGeofence === true ? 'Dentro de rango' :
-          d.insideGeofence === false ? 'Fuera de rango' : '-';
-        return {
-          "Acción"       : tipoTexto,
-          "Fecha"        : fmtFecha(d.fecha),
-          "Hora"         : d.hora || '',
-          "Departamento" : d.departamento || '',
-          "Geocerca"     : estadoGeo
-        };
-      });
+      // Fila de total
+      const hT = Math.floor(totalMs / 3600000);
+      const mT = Math.floor((totalMs % 3600000) / 60000);
       rows.push({});
-      rows.push({ "Acción": "Total horas", "Hora": totalHorasStr });
+      rows.push({ 'Día': 'TOTAL', 'Total Horas': `${hT}h ${String(mT).padStart(2,'0')}m` });
 
-      const ws = XLSX.utils.json_to_sheet(rows, { skipHeader: false });
+      const ws = XLSX.utils.json_to_sheet(rows);
       const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, "Reporte");
-      ws['!cols'] = [{wpx:120},{wpx:90},{wpx:80},{wpx:130},{wpx:130}];
-      XLSX.writeFile(wb, "reporte-usuario.xlsx");
+      XLSX.utils.book_append_sheet(wb, ws, 'Reporte');
+      ws['!cols'] = [
+        {wpx:50},{wpx:90},{wpx:70},{wpx:90},{wpx:100},{wpx:90},{wpx:90},{wpx:170}
+      ];
+      const periodo = desde && hasta ? `_${desde}_al_${hasta}` : '';
+      XLSX.writeFile(wb, `reporte-${usuario}${periodo}.xlsx`);
     }
 
+    // ══════════════════════════════════════════════
+    // EXPORTAR PDF
+    // ══════════════════════════════════════════════
     async function exportarPDF() {
-      if (!datosGlobal.length) {
-        alert("Primero debe cargar un reporte.");
-        return;
-      }
-      const usuario = document.getElementById("usuario").value.trim();
+      if (!datosGlobal.length) { alert('Primero carga un reporte.'); return; }
 
-      const usuariosRes = await fetch("/api/usuarios");
-      const mapaNombres = await usuariosRes.json().catch(() => ({}));
-      const nombreCompleto = mapaNombres[usuario] || usuario;
+      const usuario = document.getElementById('usuario').value;
+      const desde   = document.getElementById('fechaDesde').value;
+      const hasta   = document.getElementById('fechaHasta').value;
+
+      // Agrupar por día
+      const porDia = {};
+      datosGlobal.forEach(r => {
+        if (!porDia[r.fecha]) porDia[r.fecha] = [];
+        porDia[r.fecha].push(r);
+      });
+
+      let totalMs = 0;
+      const filas = [];
+
+      Object.keys(porDia).sort().forEach(fecha => {
+        const regs = porDia[fecha];
+        const get  = tipo => regs.find(r => r.tipo === tipo) || null;
+        const entrada      = get('entrada');
+        const salidaLunch  = get('salida_lunch');
+        const entradaLunch = get('entrada_lunch');
+        const salida       = get('salida');
+        const esAuto       = salida && (salida.auto === 1 || salida.auto === true);
+
+        let horasTexto = '—';
+        if (entrada && salida) {
+          const ini = new Date(`${fecha}T${(entrada.hora||'').slice(0,5)}:00`);
+          const fin = new Date(`${fecha}T${(salida.hora ||'').slice(0,5)}:00`);
+          if (!isNaN(ini) && !isNaN(fin) && fin > ini) {
+            const ms = fin - ini;
+            totalMs += ms;
+            const h  = Math.floor(ms / 3600000);
+            const m  = Math.floor((ms % 3600000) / 60000);
+            horasTexto = `${h}h ${String(m).padStart(2,'0')}m`;
+          }
+        }
+
+        const alertas = [];
+        if (entrada && !salida) alertas.push('Sin salida');
+        if (esAuto)             alertas.push('Salida auto');
+        if (entrada && (entrada.hora||'') > '09:35:00') alertas.push('Tardanza');
+        if (regs.some(r => r.insideGeofence === false || r.insideGeofence === 0)) alertas.push('Fuera de geo');
+
+        filas.push([
+          nombreDia(fecha),
+          fmtCorta(fecha),
+          entrada      ? (entrada.hora     ||'').slice(0,5) : '—',
+          salidaLunch  ? (salidaLunch.hora ||'').slice(0,5) : '—',
+          entradaLunch ? (entradaLunch.hora||'').slice(0,5) : '—',
+          salida       ? `${(salida.hora||'').slice(0,5)}${esAuto ? '*' : ''}` : '—',
+          horasTexto,
+          alertas.join(', ') || '✓'
+        ]);
+      });
+
+      const hT = Math.floor(totalMs / 3600000);
+      const mT = Math.floor((totalMs % 3600000) / 60000);
+      filas.push(['', '', '', '', '', 'TOTAL:', `${hT}h ${String(mT).padStart(2,'0')}m`, '']);
 
       const { jsPDF } = window.jspdf;
-      const doc = new jsPDF();
+      const doc = new jsPDF({ orientation: 'landscape' });
 
       const img = new Image();
       img.src = 'logo-dinex.png';
-
       img.onload = () => {
-        doc.addImage(img, 'PNG', 14, 8, 50, 15);
-        doc.setFontSize(12);
+        doc.addImage(img, 'PNG', 14, 6, 40, 12);
+        doc.setFontSize(13);
+        doc.setTextColor(30);
+        doc.text(`Empleado: ${nombreEmpleado || usuario}`, 60, 13);
+        doc.setFontSize(11);
         doc.setTextColor(100);
-        doc.text(`Empleado: ${nombreCompleto}`, 70, 20);
-        doc.setFontSize(14);
-        doc.setTextColor(0);
-        doc.text("Reporte de Horas por Empleado", 70, 28);
-
-        const cols = ["Acción", "Fecha", "Hora", "Departamento", "Geocerca"];
-        const filas = datosGlobal.map(d => {
-          const tipoTexto = d.tipo === "salida" && d.auto === true ? "salida (automática)" : (d.tipo || '');
-          const estadoGeo =
-            d.insideGeofence === true ? 'Dentro de rango' :
-            d.insideGeofence === false ? 'Fuera de rango' : '-';
-          return [tipoTexto, fmtFecha(d.fecha), d.hora || '', d.departamento || '', estadoGeo];
-        });
-        filas.push(['','','','','']);
-        filas.push(['Total horas','', totalHorasStr,'','']);
+        if (desde && hasta) doc.text(`Periodo: ${fmtCorta(desde)} al ${fmtCorta(hasta)}`, 60, 19);
 
         doc.autoTable({
-          startY: 35,
-          head: [cols],
+          startY: 24,
+          head: [['Día','Fecha','Entrada','Sal. Lunch','Reg. Lunch','Salida','Total Horas','Alertas']],
           body: filas,
-          styles: { fontSize: 10 },
-          headStyles: { fillColor: [236, 0, 140] }
+          styles: { fontSize: 9, halign: 'center' },
+          headStyles: { fillColor: [236, 0, 140], textColor: 255 },
+          columnStyles: { 7: { halign: 'left' } },
+          didParseCell: (data) => {
+            if (data.section === 'body') {
+              const alertasTxt = data.row.raw[7] || '';
+              if (alertasTxt.includes('Sin salida') || alertasTxt.includes('incompleto')) {
+                data.cell.styles.fillColor = [255, 240, 240];
+              } else if (alertasTxt.includes('auto') || alertasTxt.includes('Tardanza')) {
+                data.cell.styles.fillColor = [255, 252, 235];
+              }
+            }
+          }
         });
 
-        doc.save("reporte-usuario.pdf");
+        const periodo = desde && hasta ? `_${desde}_al_${hasta}` : '';
+        doc.save(`reporte-${usuario}${periodo}.pdf`);
       };
     }
-    // Si viene usuario en la URL, cargarlo automáticamente
-    document.addEventListener('DOMContentLoaded', () => {
-      const params = new URLSearchParams(window.location.search);
-      const u = params.get('usuario');
-      if (u) {
-        document.getElementById('usuario').value = u;
-        document.getElementById('usuarioBusca').value = u;
+
+    // ══════════════════════════════════════════════
+    // INICIALIZACIÓN
+    // ══════════════════════════════════════════════
+    document.addEventListener('DOMContentLoaded', async () => {
+      await cargarEmpleados();
+
+      // Preseleccionar la quincena actual (Sáb → Vie)
+      setQuincena(quincenaDeHoy());
+
+      // Si viene usuario en la URL, cargarlo automáticamente
+      const params  = new URLSearchParams(window.location.search);
+      const uParam  = params.get('usuario');
+      if (uParam) {
+        document.getElementById('usuario').value      = uParam;
+        document.getElementById('usuarioBusca').value = uParam;
+        // Buscar nombre completo
+        const encontrado = empleadosActivos.find(u => u.usuario === uParam);
+        if (encontrado) {
+          nombreEmpleado = encontrado.nombre || uParam;
+          document.getElementById('empleado-seleccionado').textContent =
+            `Empleado: ${nombreEmpleado} — ${encontrado.departamento || ''}`;
+        }
         cargarReporte();
       }
     });

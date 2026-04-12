@@ -211,13 +211,7 @@ const MODO_ESTRICTO = false;
 
 // ==== Middleware verificar admin (sin cambios — mantiene compatibilidad total) ====
 function verificarAdmin(req, res, next) {
-  let username, password;
-  try {
-    const raw = req.headers['x-admin-auth'];
-    if (raw) ({ username, password } = JSON.parse(raw));
-  } catch (_) {
-    return res.status(401).json({ success: false, mensaje: 'No autorizado.' });
-  }
+  const { username, password } = req.headers['x-admin-auth'] ? JSON.parse(req.headers['x-admin-auth']) : {};
   const admins = readJsonSafe(PATHS.admins, []);
   const valid = admins.some(a => a.username === username && bcrypt.compareSync(password || '', a.password));
   if (!valid) return res.status(401).json({ success: false, mensaje: 'No autorizado.' });
@@ -236,39 +230,6 @@ function loginRateLimit(req, res, next) {
   if (entry.count > 10) {
     const restSec = Math.ceil((entry.resetAt - now) / 1000);
     return res.status(429).json({ success: false, mensaje: `Demasiados intentos. Espera ${restSec} segundos.` });
-  }
-  next();
-}
-
-// ==== [FIX A-5] Rate limiting para endpoints públicos (lectura) ====
-// 60 requests por minuto por IP — más que suficiente para uso normal
-// Protege contra scraping masivo y ataques de enumeración
-const _apiRequests = new Map();
-function apiRateLimit(req, res, next) {
-  const ip  = getRealIp(req);
-  const now = Date.now();
-  const entry = _apiRequests.get(ip) || { count: 0, resetAt: now + 60 * 1000 };
-  if (now > entry.resetAt) { entry.count = 0; entry.resetAt = now + 60 * 1000; }
-  entry.count++;
-  _apiRequests.set(ip, entry);
-  if (entry.count > 60) {
-    return res.status(429).json({ success: false, mensaje: 'Demasiadas solicitudes. Espera un momento.' });
-  }
-  next();
-}
-
-// ==== [FIX A-6] Rate limiting para marcaje por IP ====
-// Máx 20 marcajes por minuto por IP — evita ataques de marcaje masivo
-const _marcarRequests = new Map();
-function marcarRateLimit(req, res, next) {
-  const ip  = getRealIp(req);
-  const now = Date.now();
-  const entry = _marcarRequests.get(ip) || { count: 0, resetAt: now + 60 * 1000 };
-  if (now > entry.resetAt) { entry.count = 0; entry.resetAt = now + 60 * 1000; }
-  entry.count++;
-  _marcarRequests.set(ip, entry);
-  if (entry.count > 20) {
-    return res.status(429).json({ success: false, mensaje: 'Demasiados intentos de marcaje. Espera un momento.' });
   }
   next();
 }
@@ -319,70 +280,12 @@ function ejecutarBackup() {
 
 cron.schedule('0 23 * * *', ejecutarBackup, { timezone: 'America/Chicago' });
 
-// ==== [FIX B-5] Backup adicional los domingos a las 11PM ====
-// Doble protección semanal — copia a subcarpeta /backups/semanal
-cron.schedule('0 23 * * 0', () => {
-  const fecha  = moment().tz('America/Chicago').format('YYYY-MM-DD');
-  const semDir = path.join(PATHS.backupsDir, 'semanal');
-  try {
-    if (!fs.existsSync(semDir)) fs.mkdirSync(semDir, { recursive: true });
-    const archivos = [
-      { src: PATHS.dbFile,      dst: path.join(semDir, `dev-semanal-${fecha}.db`)      },
-      { src: PATHS.users,       dst: path.join(semDir, `users-semanal-${fecha}.json`)   },
-      { src: PATHS.admins,      dst: path.join(semDir, `admins-semanal-${fecha}.json`)  },
-      { src: PATHS.supervisors, dst: path.join(semDir, `supervisors-semanal-${fecha}.json`) },
-      { src: PATHS.marcajes,    dst: path.join(semDir, `marcajes-semanal-${fecha}.json`) },
-    ];
-    archivos.forEach(({ src, dst }) => {
-      try { if (fs.existsSync(src)) fse.copySync(src, dst); }
-      catch (e) { console.error(`[Backup Semanal] Error: ${src}`, e.message); }
-    });
-    // Conservar solo últimas 8 semanas
-    const limite = moment().tz('America/Chicago').subtract(56, 'days');
-    fs.readdirSync(semDir).forEach(f => {
-      const match = f.match(/-(\d{4}-\d{2}-\d{2})\./);
-      if (match && moment(match[1]).isBefore(limite)) {
-        fs.unlinkSync(path.join(semDir, f));
-      }
-    });
-    console.log(`[Backup Semanal] ${fecha} completado OK`);
-  } catch(e) { console.error('[Backup Semanal] Error crítico:', e.message); }
-}, { timezone: 'America/Chicago' });
-
 app.get('/api/backup-now', verificarAdmin, (req, res) => {
   const errores = ejecutarBackup();
-  const fecha   = moment().tz('America/Chicago').format('YYYY-MM-DD HH:mm:ss');
   if (errores.length === 0) {
-    res.json({ success: true, mensaje: `Backup completo creado el ${fecha}.`, fecha });
+    res.json({ success: true, mensaje: 'Backup completo creado correctamente.' });
   } else {
     res.status(500).json({ success: false, mensaje: `Backup parcial. Errores en: ${errores.join(', ')}` });
-  }
-});
-
-// ==== [FIX B-6] Endpoint para verificar estado del último backup ====
-app.get('/api/backup-status', verificarAdmin, (req, res) => {
-  try {
-    if (!fs.existsSync(PATHS.backupsDir)) {
-      return res.json({ success: false, mensaje: 'Carpeta de backups no encontrada.' });
-    }
-    const archivos = fs.readdirSync(PATHS.backupsDir)
-      .filter(f => f.endsWith('.db') || f.endsWith('.json'))
-      .map(f => {
-        const full  = path.join(PATHS.backupsDir, f);
-        const stats = fs.statSync(full);
-        return { nombre: f, fecha: stats.mtime, tamanio: stats.size };
-      })
-      .sort((a, b) => b.fecha - a.fecha);
-    const ultimo = archivos[0];
-    res.json({
-      success:      true,
-      totalArchivos: archivos.length,
-      ultimoBackup:  ultimo ? moment(ultimo.fecha).tz('America/Chicago').format('MM/DD/YYYY HH:mm') : 'Ninguno',
-      archivos:      archivos.slice(0, 10)
-    });
-  } catch(e) {
-    console.error('GET /api/backup-status error:', e);
-    res.status(500).json({ success: false, mensaje: 'Error verificando backups.' });
   }
 });
 
@@ -494,7 +397,7 @@ function rateLimitMarcaje(usuario) {
 
 // ==== Marcaje ====
 // 100% SQLite — el JSON solo se mantiene como backup secundario
-app.post('/api/marcar', marcarRateLimit, (req, res) => {
+app.post('/api/marcar', (req, res) => {
   try {
     const now       = moment().tz('America/Chicago');
     const fechaHoy  = now.format('YYYY-MM-DD');
@@ -555,39 +458,20 @@ app.post('/api/marcar', marcarRateLimit, (req, res) => {
       return res.status(403).json({ success: false, mensaje: 'Marcaje rechazado: estás fuera del área permitida.' });
     }
 
-    // Buscar registros de hoy y hasta 7 días atrás para detectar días sin salida
-    const hace7dias = moment(now).subtract(7, 'days').format('YYYY-MM-DD');
     db.all(
-      `SELECT tipo, fecha, auto FROM registros WHERE usuario = ? AND fecha >= ? AND fecha <= ? ORDER BY fecha, hora`,
-      [usuario, hace7dias, fechaHoy],
+      `SELECT tipo, fecha, auto FROM registros WHERE usuario = ? AND fecha IN (?, ?) ORDER BY fecha, hora`,
+      [usuario, fechaAyer, fechaHoy],
       (err, rows) => {
         if (err) {
           console.error('marcar SELECT:', err.message);
           return res.status(500).json({ success: false, mensaje: 'Error interno al verificar marcajes.' });
         }
 
-        const registrosHoy = rows.filter(r => r.fecha === fechaHoy);
-
-        // Buscar el día más reciente (antes de hoy) que tuvo entrada pero no salida
-        const diasPasados = [...new Set(
-          rows.filter(r => r.fecha < fechaHoy).map(r => r.fecha)
-        )].sort().reverse();
-
-        let diaIncompleto = null;
-        for (const dia of diasPasados) {
-          const regsDelDia = rows.filter(r => r.fecha === dia);
-          const tieneEntrada = regsDelDia.some(r => r.tipo === 'entrada');
-          const tieneSalida  = regsDelDia.some(r => r.tipo === 'salida');
-          if (tieneEntrada && !tieneSalida) {
-            diaIncompleto = dia;
-            break;
-          }
-        }
-
-        // Compatibilidad con lógica anterior
         const registrosAyer = rows.filter(r => r.fecha === fechaAyer);
-        const huboEntradaAyer = !!diaIncompleto;
-        const huboSalidaAyer  = !diaIncompleto;
+        const registrosHoy  = rows.filter(r => r.fecha === fechaHoy);
+
+        const huboEntradaAyer = registrosAyer.some(r => r.tipo === 'entrada');
+        const huboSalidaAyer  = registrosAyer.some(r => r.tipo === 'salida');
         let advertencia = '';
 
         const insertarMarcajeFinal = () => {
@@ -626,26 +510,8 @@ app.post('/api/marcar', marcarRateLimit, (req, res) => {
               } catch (e) { console.warn('Backup JSON no-crítico falló:', e.message); }
 
               const suffix = (!MODO_ESTRICTO && !gf.inside) ? ' (fuera de geocerca)' : '';
-
-              // ── Avisos de puntualidad (solo informativos, el marcaje ya se guardó) ──
-              let avisoTardanza = '';
-              const horaHHMM = hora.slice(0, 5); // HH:MM
-              if (tipo === 'entrada' && horaHHMM > '09:35') {
-                // Calcular minutos de tardanza
-                const [hE, mE] = horaHHMM.split(':').map(Number);
-                const minsTardanza = (hE * 60 + mE) - (9 * 60 + 35);
-                avisoTardanza = ` ⚠️ Llegaste ${minsTardanza} minuto${minsTardanza !== 1 ? 's' : ''} tarde (hora límite: 9:35 AM).`;
-              }
-              if (tipo === 'entrada_lunch' && horaHHMM > '14:05') {
-                // Calcular minutos extra de lunch
-                const [hL, mL] = horaHHMM.split(':').map(Number);
-                const minsExtra = (hL * 60 + mL) - (14 * 60 + 5);
-                avisoTardanza = ` ⚠️ Regresaste ${minsExtra} minuto${minsExtra !== 1 ? 's' : ''} tarde del lunch (hora límite: 2:05 PM).`;
-              }
-
               const mensajeFinal = (advertencia ? advertencia + ' ' : '') +
-                                   `Marcaje de ${tipo} registrado a las ${hora}.` +
-                                   avisoTardanza;
+                                   `Marcaje de ${tipo} registrado a las ${hora}.`;
               res.json({
                 success: true,
                 mensaje: mensajeFinal + suffix,
@@ -657,19 +523,19 @@ app.post('/api/marcar', marcarRateLimit, (req, res) => {
         };
 
         if (huboEntradaAyer && !huboSalidaAyer) {
-          advertencia = `⚠️ El ${diaIncompleto} no marcaste salida. Se registró salida automática a las 7:30 PM.`;
+          advertencia = '⚠️ Ayer no marcaste salida. Se registró salida automática a las 19:30.';
           db.run(
             `INSERT INTO registros
               (usuario, tipo, fecha, hora, ip, departamento, lat, lng, accuracy,
                insideGeofence, geofenceId, geofenceName, distanceToCenterM, userAgent, auto)
              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-            [usuario, 'salida', diaIncompleto, '19:30:00', ip, departamento,
+            [usuario, 'salida', fechaAyer, '19:30:00', ip, departamento,
              null, null, null, null, null, null, null, null, 1],
             (errAuto) => {
               if (errAuto) console.error('SQLite auto-salida:', errAuto.message);
               try {
                 const all = readJsonSafe(PATHS.marcajes, []);
-                all.push({ usuario, tipo: 'salida', fecha: diaIncompleto, hora: '19:30:00',
+                all.push({ usuario, tipo: 'salida', fecha: fechaAyer, hora: '19:30:00',
                            ip, departamento, auto: true });
                 writeJsonSafe(PATHS.marcajes, all);
               } catch(e) { /* no-crítico */ }
@@ -689,38 +555,31 @@ app.post('/api/marcar', marcarRateLimit, (req, res) => {
 });
 
 // ==== Reportes ====
-app.get('/api/reporte', apiRateLimit, (req, res) => {
+app.get('/api/reporte', (req, res) => {
   try {
     const usuario = req.query.usuario;
     if (!usuario) return res.json([]);
     const users = readJsonSafe(PATHS.users, []);
     const user = users.find(u => u.usuario === usuario);
     if (!user) return res.json([]);
-
-    // Filtro opcional de fechas — si no se mandan, devuelve todo (compatible con versiones anteriores)
-    const desde = req.query.desde || null;
-    const hasta = req.query.hasta || null;
-
-    let query  = `SELECT * FROM registros WHERE usuario = ?`;
-    const params = [usuario];
-    if (desde) { query += ` AND fecha >= ?`; params.push(desde); }
-    if (hasta) { query += ` AND fecha <= ?`; params.push(hasta); }
-    query += ` ORDER BY fecha ASC, hora ASC`;
-
-    db.all(query, params, (err, rows) => {
-      if (err) {
-        console.error('SQLite reporte:', err.message);
-        return res.status(500).json([]);
+    db.all(
+      `SELECT * FROM registros WHERE usuario = ? ORDER BY fecha ASC, hora ASC`,
+      [usuario],
+      (err, rows) => {
+        if (err) {
+          console.error('SQLite reporte:', err.message);
+          return res.status(500).json([]);
+        }
+        res.json(rows);
       }
-      res.json(rows);
-    });
+    );
   } catch (e) {
     console.error('GET /api/reporte error:', e);
     res.status(500).json([]);
   }
 });
 
-app.get('/api/empleados', apiRateLimit, (req, res) => {
+app.get('/api/empleados', (req, res) => {
   try {
     const users = readJsonSafe(PATHS.users, []);
     res.json(users.filter(u => u.activo !== false));
@@ -730,7 +589,7 @@ app.get('/api/empleados', apiRateLimit, (req, res) => {
   }
 });
 
-app.get('/api/usuarios', apiRateLimit, (req, res) => {
+app.get('/api/usuarios', (req, res) => {
   try {
     const users = readJsonSafe(PATHS.users, []);
     // Incluye todos los usuarios (activos e inactivos) para resolución de nombres en reportes
@@ -743,7 +602,7 @@ app.get('/api/usuarios', apiRateLimit, (req, res) => {
   }
 });
 
-app.get('/api/usuarios-detalle', apiRateLimit, (req, res) => {
+app.get('/api/usuarios-detalle', (req, res) => {
   try {
     const users = readJsonSafe(PATHS.users, []);
     const detalle = users.map(u => ({
@@ -759,7 +618,7 @@ app.get('/api/usuarios-detalle', apiRateLimit, (req, res) => {
   }
 });
 
-app.get('/api/reporte-todos', apiRateLimit, (req, res) => {
+app.get('/api/reporte-todos', (req, res) => {
   try {
     const users = readJsonSafe(PATHS.users, []);
     const activos = users
@@ -768,24 +627,18 @@ app.get('/api/reporte-todos', apiRateLimit, (req, res) => {
 
     if (activos.length === 0) return res.json([]);
 
-    // Filtro opcional de fechas — si no se mandan, devuelve todo (compatible con versiones anteriores)
-    const desde = req.query.desde || null;
-    const hasta = req.query.hasta || null;
-
     const placeholders = activos.map(() => '?').join(',');
-    let query  = `SELECT * FROM registros WHERE usuario IN (${placeholders})`;
-    const params = [...activos];
-    if (desde) { query += ` AND fecha >= ?`; params.push(desde); }
-    if (hasta) { query += ` AND fecha <= ?`; params.push(hasta); }
-    query += ` ORDER BY usuario ASC, fecha ASC, hora ASC`;
-
-    db.all(query, params, (err, rows) => {
-      if (err) {
-        console.error('SQLite reporte-todos:', err.message);
-        return res.status(500).json({ error: 'Error leyendo base de datos.' });
+    db.all(
+      `SELECT * FROM registros WHERE usuario IN (${placeholders}) ORDER BY usuario ASC, fecha ASC, hora ASC`,
+      activos,
+      (err, rows) => {
+        if (err) {
+          console.error('SQLite reporte-todos:', err.message);
+          return res.status(500).json({ error: 'Error leyendo base de datos.' });
+        }
+        res.json(rows);
       }
-      res.json(rows);
-    });
+    );
   } catch (e) {
     console.error('GET /api/reporte-todos error:', e);
     res.status(500).json({ error: 'Error interno leyendo marcajes.' });
@@ -982,7 +835,6 @@ app.post('/api/corregir-hora', verificarAdmin, (req, res) => {
 });
 
 // ==== [FIX C-3] agregar-marcaje ahora requiere verificarAdmin ====
-// ==== [FIX C-4] Validación anti-duplicado en agregar-marcaje manual ====
 app.post('/api/agregar-marcaje', verificarAdmin, (req, res) => {
   try {
     const { usuario, departamento, tipo, fecha, hora } = req.body || {};
@@ -991,33 +843,18 @@ app.post('/api/agregar-marcaje', verificarAdmin, (req, res) => {
     }
     const ip = getRealIp(req);
 
-    // Verificar si ya existe ese tipo de marcaje para ese usuario y fecha
-    db.get(
-      `SELECT id FROM registros WHERE usuario = ? AND tipo = ? AND fecha = ?`,
-      [usuario, tipo, fecha],
-      (errCheck, existing) => {
-        if (errCheck) {
-          console.error('SQLite check duplicado:', errCheck.message);
-          return res.status(500).json({ success: false, mensaje: 'Error interno al verificar duplicados.' });
+    db.run(
+      `INSERT INTO registros (usuario, tipo, fecha, hora, ip, departamento) VALUES (?, ?, ?, ?, ?, ?)`,
+      [usuario, tipo, fecha, hora, ip, departamento],
+      (err) => {
+        if (err) {
+          console.error('SQLite insertar manual:', err.message);
+          return res.json({ success: false, mensaje: 'Error al guardar en la base de datos.' });
         }
-        if (existing) {
-          return res.json({ success: false, mensaje: `Ya existe un registro de "${tipo}" para ${usuario} el ${fecha}.` });
-        }
-
-        db.run(
-          `INSERT INTO registros (usuario, tipo, fecha, hora, ip, departamento) VALUES (?, ?, ?, ?, ?, ?)`,
-          [usuario, tipo, fecha, hora, ip, departamento],
-          (err) => {
-            if (err) {
-              console.error('SQLite insertar manual:', err.message);
-              return res.json({ success: false, mensaje: 'Error al guardar en la base de datos.' });
-            }
-            const all = readJsonSafe(PATHS.marcajes, []);
-            all.push({ usuario, departamento, tipo, fecha, hora, ip });
-            writeJsonSafe(PATHS.marcajes, all);
-            res.json({ success: true, mensaje: 'Registro agregado correctamente.' });
-          }
-        );
+        const all = readJsonSafe(PATHS.marcajes, []);
+        all.push({ usuario, departamento, tipo, fecha, hora, ip });
+        writeJsonSafe(PATHS.marcajes, all);
+        res.json({ success: true, mensaje: 'Registro agregado correctamente.' });
       }
     );
   } catch (e) {
@@ -1027,7 +864,7 @@ app.post('/api/agregar-marcaje', verificarAdmin, (req, res) => {
 });
 
 // ==== Dashboard resumen estado hoy ====
-app.get('/api/resumen-estado-hoy', apiRateLimit, (req, res) => {
+app.get('/api/resumen-estado-hoy', (req, res) => {
   try {
     const usuarios = readJsonSafe(PATHS.users, []);
     const activosUsers = usuarios.filter(u => u.activo !== false);
@@ -1166,106 +1003,6 @@ app.delete('/api/eliminar-supervisor', verificarAdmin, (req, res) => {
     writeJsonSafe(PATHS.supervisors, supervisors);
     res.json({ success: true });
   } catch (e) { res.status(500).json({ success: false }); }
-});
-
-
-// ==== NORMALIZACIÓN AUTOMÁTICA DE HORARIOS ====
-// Lógica: establece horas EXACTAS para todos los registros del rango
-// Sin importar si el empleado llegó antes o después — siempre queda la hora configurada
-app.post('/api/normalizar-preview', verificarAdmin, (req, res) => {
-  try {
-    const { desde, hasta } = req.body || {};
-    if (!desde || !hasta) return res.json({ success: false, mensaje: 'Faltan fechas.' });
-
-    // Horas exactas configuradas por el admin en el frontend
-    const horasFijas = (req.body && req.body.horasFijas) || {
-      entrada:       '09:30:00',
-      salida_lunch:  '13:00:00',
-      entrada_lunch: '14:00:00',
-      salida:        '19:30:00'
-    };
-
-    const users = readJsonSafe(PATHS.users, []);
-    const activos = users
-      .filter(u => u.activo !== false && u.estado !== 'Eliminado' && u.estado !== 'Inactivo')
-      .map(u => ({ usuario: u.usuario, nombre: u.nombre || u.usuario }));
-
-    if (!activos.length) return res.json({ success: true, cambios: [] });
-
-    const ids = activos.map(u => u.usuario);
-    const nameMap = {};
-    activos.forEach(u => { nameMap[u.usuario] = u.nombre; });
-    const placeholders = ids.map(() => '?').join(',');
-
-    db.all(
-      `SELECT id, usuario, tipo, fecha, hora FROM registros
-       WHERE usuario IN (${placeholders}) AND fecha >= ? AND fecha <= ?
-       ORDER BY usuario, fecha, hora`,
-      [...ids, desde, hasta],
-      (err, rows) => {
-        if (err) return res.status(500).json({ success: false, mensaje: 'Error leyendo DB.' });
-
-        const cambios = [];
-        rows.forEach(r => {
-          // Solo procesar los 4 tipos de marcaje estándar
-          const horaFija = horasFijas[r.tipo];
-          if (!horaFija) return;
-
-          const horaActual = (r.hora || '').slice(0, 8); // HH:MM:SS
-          const horaObjetivo = horaFija.length === 5 ? horaFija + ':00' : horaFija;
-
-          // Siempre corregir — sin importar si ya está bien o no
-          if (horaActual !== horaObjetivo) {
-            cambios.push({
-              id:            r.id,
-              usuario:       r.usuario,
-              nombre:        nameMap[r.usuario] || r.usuario,
-              fecha:         r.fecha,
-              tipo:          r.tipo,
-              horaOriginal:  r.hora,
-              horaCorregida: horaObjetivo
-            });
-          }
-        });
-
-        res.json({ success: true, cambios });
-      }
-    );
-  } catch (e) {
-    console.error('POST /api/normalizar-preview error:', e);
-    res.status(500).json({ success: false, mensaje: 'Error interno.' });
-  }
-});
-
-// Endpoint de APLICAR — guarda los cambios confirmados
-app.post('/api/normalizar-aplicar', verificarAdmin, (req, res) => {
-  try {
-    const { cambios } = req.body || {};
-    if (!cambios || !cambios.length) return res.json({ success: false, mensaje: 'No hay cambios.' });
-
-    let completados = 0;
-    let errores = 0;
-
-    const aplicarSiguiente = (i) => {
-      if (i >= cambios.length) {
-        return res.json({ success: true, completados, errores });
-      }
-      const c = cambios[i];
-      db.run(
-        `UPDATE registros SET hora = ? WHERE id = ?`,
-        [c.horaCorregida, c.id],
-        (err) => {
-          if (err) { errores++; console.error('normalizar-aplicar:', err.message); }
-          else completados++;
-          aplicarSiguiente(i + 1);
-        }
-      );
-    };
-    aplicarSiguiente(0);
-  } catch (e) {
-    console.error('POST /api/normalizar-aplicar error:', e);
-    res.status(500).json({ success: false, mensaje: 'Error interno.' });
-  }
 });
 
 // ==== Manejador global de errores ====
