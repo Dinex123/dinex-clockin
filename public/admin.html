@@ -134,6 +134,7 @@
           <a href="empleados.html"><i data-lucide="users"></i>Usuarios</a>
           <a href="empleados_inactivos.html"><i data-lucide="user-x"></i>Empleados Inactivos</a>
           <a href="supervisores.html"><i data-lucide="monitor"></i>Supervisores</a>
+          <a href="#" onclick="probarCorreo(event)"><i data-lucide="mail"></i>Probar Correo</a>
           <a href="#" id="btnLogout"><i data-lucide="log-out"></i>Cerrar Sesión</a>
         </div>
       </div>
@@ -307,6 +308,26 @@
         console.error('Error cargando resumen:', err);
       }
     });
+
+    async function probarCorreo(e) {
+      e.preventDefault();
+      if (!confirm('¿Enviar correo de prueba a ffernandez@dinexenvios.com y mmarfil@dinexenvios.com?')) return;
+      try {
+        const res = await fetch('/api/test-correo', {
+          headers: {
+            'Content-Type': 'application/json',
+            'x-admin-auth': JSON.stringify({
+              username: sessionStorage.getItem('adminUser') || '',
+              password: sessionStorage.getItem('adminPass') || ''
+            })
+          }
+        });
+        const data = await res.json();
+        alert(data.mensaje);
+      } catch (err) {
+        alert('Error de conexion con el servidor.');
+      }
+    }
   </script>
 
   <!-- Helpers comunes -->

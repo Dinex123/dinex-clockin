@@ -502,6 +502,36 @@ app.get('/api/backup-status', verificarAdmin, (req, res) => {
   }
 });
 
+// ==== Endpoint de prueba de correo ====
+app.get('/api/test-correo', verificarAdmin, async (req, res) => {
+  try {
+    const fecha = moment().tz('America/Chicago').format('MM/DD/YYYY HH:mm');
+    await mailTransporter.sendMail({
+      from:    '"DinEX WebClock" <dinexwebclock@dinexenvios.com>',
+      to:      'ffernandez@dinexenvios.com, mmarfil@dinexenvios.com',
+      subject: `[DinEX] Correo de prueba — ${fecha}`,
+      html: `
+        <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;">
+          <img src="https://dinex-webclock.onrender.com/logo-dinex.png"
+               alt="DinEX" style="max-width:180px;margin-bottom:16px;">
+          <h2 style="color:#84ae05;">Correo de prueba exitoso</h2>
+          <p>Este correo confirma que las notificaciones automaticas de DinEX WebClock
+             estan configuradas correctamente.</p>
+          <p>Cada noche a las <strong>9:00 PM</strong> llegara un correo con la lista
+             de empleados que marcaron entrada pero no registraron salida.</p>
+          <p style="color:#888;font-size:12px;margin-top:24px;">
+            Enviado el ${fecha} desde DinEX WebClock.
+          </p>
+        </div>
+      `
+    });
+    res.json({ success: true, mensaje: 'Correo de prueba enviado correctamente.' });
+  } catch (e) {
+    console.error('[Test Correo]', e.message);
+    res.status(500).json({ success: false, mensaje: `Error: ${e.message}` });
+  }
+});
+
 // ==== Auth Admin Login — [FIX A-1] con rate limiting ====
 app.post('/api/admin-login', loginRateLimit, (req, res) => {
   try {
