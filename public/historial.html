@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Historial de Correcciones</title>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    .contenedor { max-width: 1100px; margin: 0 auto; padding: 20px; }
+    .logo { display: block; margin: 0 auto 10px auto; max-width: 220px; }
+    h1 { text-align: center; margin-bottom: 16px; color: #84ae05; }
+
+    .boton {
+      background-color: #ec008c; color: white; border: none;
+      padding: 9px 18px; margin: 4px; border-radius: 6px;
+      cursor: pointer; font-size: 14px; text-decoration: none;
+      display: inline-block; transition: background .2s;
+    }
+    .boton:hover { background-color: #c60074; }
+    .boton.verde { background-color: #84ae05; }
+    .boton.verde:hover { background-color: #6a8c04; }
+    .boton.gris { background-color: #888; }
+    .boton.gris:hover { background-color: #666; }
+
+    .quincena-wrap {
+      display: flex; justify-content: center; align-items: center;
+      gap: 8px; flex-wrap: wrap; margin: 12px 0;
+      padding: 12px 16px; background: #fafafa;
+      border: 1px solid #e8e8e8; border-radius: 8px;
+    }
+    .quincena-wrap label { font-size: 13px; color: #555; font-weight: 600; }
+    .quincena-wrap input[type="date"] {
+      padding: 6px 10px; font-size: 13px;
+      border: 1px solid #ccc; border-radius: 6px; color: #333;
+    }
+    .quincena-wrap input[type="date"]:focus { border-color: #ec008c; outline: none; }
+    .sep { font-size: 13px; color: #888; }
+    #info-quincena {
+      text-align: center; font-size: 12px; color: #84ae05;
+      font-weight: 600; margin: 4px 0 10px; min-height: 16px;
+    }
+
+    .tabla-historial {
+      width: 100%; border-collapse: collapse;
+      font-size: 13px; margin-top: 16px;
+      box-shadow: 0 0 6px rgba(0,0,0,.08);
+    }
+    .tabla-historial th {
+      background: #84ae05; color: white;
+      padding: 10px 8px; font-weight: bold;
+      text-align: center; white-space: nowrap;
+    }
+    .tabla-historial td {
+      padding: 9px 8px; border-bottom: 1px solid #eee;
+      text-align: center; vertical-align: middle;
+    }
+    .tabla-historial tbody tr:hover td { background: #f5fbea; }
+
+    .badge {
+      display: inline-block; font-size: 11px; padding: 3px 8px;
+      border-radius: 4px; font-weight: 600; white-space: nowrap;
+    }
+    .badge-correccion { background: #fff3e0; color: #b45309; }
+    .badge-agregar    { background: #e7f7e7; color: #167c16; }
+    .badge-eliminar   { background: #ffe6e6; color: #b01919; }
+
+    #mensaje-carga {
+      text-align: center; font-size: 14px; color: #888;
+      margin: 30px 0; font-style: italic;
+    }
+
+    .sin-datos {
+      text-align: center; padding: 40px;
+      color: #84ae05; font-size: 15px; font-weight: 600;
+    }
+
+    .busca-wrap {
+      display: flex; justify-content: center; gap: 10px;
+      margin: 10px 0; flex-wrap: wrap;
+    }
+    .busca-wrap input {
+      padding: 7px 12px; font-size: 13px; width: 220px;
+      border: 1px solid #ccc; border-radius: 6px;
+    }
+    .busca-wrap input:focus { border-color: #84ae05; outline: none; }
+  </style>
+</head>
+<body>
+
+  <script>
+    (function() {
+      if (!sessionStorage.getItem('adminUser')) {
+        window.location.replace('admin-login.html');
+      }
+    })();
+  </script>
+
+  <div class="contenedor">
+    <img src="logo-dinex.png" alt="Logo DinEX" class="logo">
+    <h1>Historial de Correcciones</h1>
+    <p style="text-align:center;color:#777;font-size:14px;margin:-10px 0 14px;">
+      Registro de todos los cambios manuales hechos por los administradores
+    </p>
+
+    <!-- Selector de quincena -->
+    <div class="quincena-wrap">
+      <label>📅 Desde:</label>
+      <input type="date" id="fechaDesde">
+      <span class="sep">→</span>
+      <label>Hasta:</label>
+      <input type="date" id="fechaHasta">
+      <button onclick="aplicarFiltro()" class="boton verde" style="font-size:13px;padding:6px 14px;">Filtrar</button>
+      <button onclick="quincenaAnterior()" class="boton gris" style="font-size:12px;padding:6px 12px;">◀ Anterior</button>
+      <button onclick="quincenaSiguiente()" class="boton gris" style="font-size:12px;padding:6px 12px;">Siguiente ▶</button>
+    </div>
+    <div id="info-quincena"></div>
+
+    <!-- Búsqueda -->
+    <div class="busca-wrap">
+      <input type="text" id="filtroBusca" placeholder="Buscar por empleado o admin..."
+        oninput="filtrarTabla()">
+      <select id="filtroAccion" onchange="filtrarTabla()"
+        style="padding:7px 10px;font-size:13px;border:1px solid #ccc;border-radius:6px;">
+        <option value="todos">Todas las acciones</option>
+        <option value="CORRECCION">Correcciones</option>
+        <option value="AGREGAR">Agregados</option>
+        <option value="ELIMINAR">Eliminados</option>
+      </select>
+    </div>
+
+    <!-- Botones -->
+    <div style="text-align:center;margin:10px 0;">
+      <button onclick="cargarHistorial()" class="boton verde">↺ Actualizar</button>
+      <a href="admin.html" class="boton gris">← Volver al Panel</a>
+    </div>
+
+    <div id="mensaje-carga">Cargando historial...</div>
+    <div id="contenedor-tabla"></div>
+
+    <br>
+    <div style="text-align:center;">
+      <a href="admin.html" class="boton gris">← Volver al Panel</a>
+    </div>
+  </div>
+
+  <script>
+    // ══════════════════════════════════════════════
+    // QUINCENAS (Sábado → Viernes, 14 días)
+    // ══════════════════════════════════════════════
+    const ANCHOR = new Date(2026, 2, 21);
+
+    function quincenaDeHoy() {
+      const hoy = new Date(); hoy.setHours(0,0,0,0);
+      const diffDia = Math.floor((hoy - ANCHOR) / 86400000);
+      const ciclo   = Math.floor(diffDia / 14);
+      const inicio  = new Date(ANCHOR);
+      inicio.setDate(ANCHOR.getDate() + ciclo * 14);
+      const fin = new Date(inicio); fin.setDate(inicio.getDate() + 13);
+      return { inicio, fin };
+    }
+
+    function quincenaDesdeFecha(fecha) {
+      fecha.setHours(0,0,0,0);
+      const diffDia = Math.floor((fecha - ANCHOR) / 86400000);
+      const ciclo   = Math.floor(diffDia / 14);
+      const inicio  = new Date(ANCHOR);
+      inicio.setDate(ANCHOR.getDate() + ciclo * 14);
+      const fin = new Date(inicio); fin.setDate(inicio.getDate() + 13);
+      return { inicio, fin };
+    }
+
+    function fmtISO(d) {
+      return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    }
+
+    function fmtCorta(iso) {
+      if (!iso || !iso.includes('-')) return '';
+      const [y,m,d] = iso.split('-');
+      return `${m}/${d}/${y}`;
+    }
+
+    function setQuincena(q) {
+      document.getElementById('fechaDesde').value = fmtISO(q.inicio);
+      document.getElementById('fechaHasta').value = fmtISO(q.fin);
+      actualizarInfoQ();
+    }
+
+    function actualizarInfoQ() {
+      const d = document.getElementById('fechaDesde').value;
+      const h = document.getElementById('fechaHasta').value;
+      document.getElementById('info-quincena').textContent =
+        d && h ? `📅 Quincena: ${fmtCorta(d)} → ${fmtCorta(h)}` : '';
+    }
+
+    function quincenaAnterior() {
+      const d = document.getElementById('fechaDesde').value;
+      if (!d) return;
+      const fecha = new Date(d + 'T12:00:00');
+      fecha.setDate(fecha.getDate() - 14);
+      setQuincena(quincenaDesdeFecha(fecha));
+      cargarHistorial();
+    }
+
+    function quincenaSiguiente() {
+      const h = document.getElementById('fechaHasta').value;
+      if (!h) return;
+      const fecha = new Date(h + 'T12:00:00');
+      fecha.setDate(fecha.getDate() + 1);
+      setQuincena(quincenaDesdeFecha(fecha));
+      cargarHistorial();
+    }
+
+    function aplicarFiltro() {
+      const d = document.getElementById('fechaDesde').value;
+      const h = document.getElementById('fechaHasta').value;
+      if (!d || !h) { alert('Selecciona ambas fechas.'); return; }
+      actualizarInfoQ();
+      cargarHistorial();
+    }
+
+    // ══════════════════════════════════════════════
+    // DATOS
+    // ══════════════════════════════════════════════
+    let historialGlobal = [];
+
+    function adminHeaders() {
+      return {
+        'Content-Type': 'application/json',
+        'x-admin-auth': JSON.stringify({
+          username: sessionStorage.getItem('adminUser') || '',
+          password: sessionStorage.getItem('adminPass') || ''
+        })
+      };
+    }
+
+    async function cargarHistorial() {
+      document.getElementById('mensaje-carga').textContent = 'Cargando historial...';
+      document.getElementById('contenedor-tabla').innerHTML = '';
+
+      const desde = document.getElementById('fechaDesde').value;
+      const hasta = document.getElementById('fechaHasta').value;
+
+      try {
+        let url = '/api/historial-correcciones';
+        if (desde && hasta) url += `?desde=${desde}&hasta=${hasta}`;
+
+        const res  = await fetch(url, { headers: adminHeaders() });
+        historialGlobal = await res.json();
+        document.getElementById('mensaje-carga').textContent = '';
+        filtrarTabla();
+      } catch (e) {
+        console.error(e);
+        document.getElementById('mensaje-carga').textContent = '❌ Error cargando historial.';
+      }
+    }
+
+    function filtrarTabla() {
+      const busca  = (document.getElementById('filtroBusca').value || '').toLowerCase().trim();
+      const accion = document.getElementById('filtroAccion').value;
+
+      let datos = [...historialGlobal];
+
+      if (accion !== 'todos') datos = datos.filter(r => r.accion === accion);
+      if (busca) datos = datos.filter(r =>
+        (r.usuario || '').toLowerCase().includes(busca) ||
+        (r.admin   || '').toLowerCase().includes(busca) ||
+        (r.detalle || '').toLowerCase().includes(busca)
+      );
+
+      if (!datos.length) {
+        document.getElementById('contenedor-tabla').innerHTML =
+          `<div class="sin-datos">✅ No hay correcciones en este período</div>`;
+        return;
+      }
+
+      const badgeHTML = accion => {
+        if (accion === 'CORRECCION') return `<span class="badge badge-correccion">✏️ Correccion</span>`;
+        if (accion === 'AGREGAR')    return `<span class="badge badge-agregar">➕ Agregado</span>`;
+        if (accion === 'ELIMINAR')   return `<span class="badge badge-eliminar">🗑 Eliminado</span>`;
+        return `<span class="badge">${accion}</span>`;
+      };
+
+      let html = `
+        <table class="tabla-historial">
+          <thead>
+            <tr>
+              <th>Fecha</th>
+              <th>Hora</th>
+              <th>Admin</th>
+              <th>Accion</th>
+              <th>Empleado</th>
+              <th style="text-align:left;padding-left:12px;">Detalle</th>
+            </tr>
+          </thead>
+          <tbody>
+      `;
+
+      datos.forEach(r => {
+        html += `
+          <tr>
+            <td>${fmtCorta(r.fecha_accion)}</td>
+            <td>${(r.hora_accion || '').slice(0,5)}</td>
+            <td><strong>${r.admin || '—'}</strong></td>
+            <td>${badgeHTML(r.accion)}</td>
+            <td>${r.usuario || '—'}</td>
+            <td style="text-align:left;padding-left:12px;color:#555;font-size:12px;">${r.detalle || '—'}</td>
+          </tr>
+        `;
+      });
+
+      html += `</tbody></table>`;
+      html += `<p style="text-align:center;font-size:12px;color:#999;margin:10px 0;">
+        ${datos.length} registro${datos.length !== 1 ? 's' : ''} encontrado${datos.length !== 1 ? 's' : ''}
+      </p>`;
+
+      document.getElementById('contenedor-tabla').innerHTML = html;
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      setQuincena(quincenaDeHoy());
+      cargarHistorial();
+    });
+  </script>
+  <script src="common.js"></script>
+</body>
+</html>

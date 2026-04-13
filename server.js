@@ -9,7 +9,8 @@ const cron       = require('node-cron');
 const bodyParser = require('body-parser');
 const moment     = require('moment-timezone');
 const sqlite3    = require('sqlite3').verbose();
-const bcrypt    = require('bcryptjs');
+const bcrypt     = require('bcryptjs');
+const nodemailer = require('nodemailer');
 
 const app  = express();
 
@@ -139,6 +140,121 @@ db.serialize(() => {
 // ==== [FIX A-3] bodyParser con límite de 100kb para prevenir DoS ====
 app.use(bodyParser.json({ limit: '100kb' }));
 
+// ==== Tabla de historial de correcciones ====
+db.run(`CREATE TABLE IF NOT EXISTS historial_correcciones (
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  fecha_accion TEXT,
+  hora_accion  TEXT,
+  admin        TEXT,
+  accion       TEXT,
+  usuario      TEXT,
+  detalle      TEXT
+)`);
+
+// ==== Configuración de correo (variables de entorno en Render) ====
+const mailTransporter = nodemailer.createTransport({
+  host:   process.env.SMTP_HOST   || 'mail.dinexenvios.com',
+  port:   parseInt(process.env.SMTP_PORT || '465'),
+  secure: true,
+  auth: {
+    user: process.env.SMTP_USER || 'dinexwebclock@dinexenvios.com',
+    pass: process.env.SMTP_PASS || ''
+  },
+  tls: { rejectUnauthorized: false }
+});
+
+// ==== Función para registrar correcciones en historial ====
+function registrarCorreccion(admin, accion, usuario, detalle) {
+  const now    = moment().tz('America/Chicago');
+  const fecha  = now.format('YYYY-MM-DD');
+  const hora   = now.format('HH:mm:ss');
+  db.run(
+    `INSERT INTO historial_correcciones (fecha_accion, hora_accion, admin, accion, usuario, detalle)
+     VALUES (?, ?, ?, ?, ?, ?)`,
+    [fecha, hora, admin, accion, usuario, detalle],
+    (err) => { if (err) console.error('historial_correcciones error:', err.message); }
+  );
+}
+
+// ==== Función para enviar correo de días incompletos ====
+async function enviarCorreoDiasIncompletos() {
+  try {
+    const hoy    = moment().tz('America/Chicago').format('YYYY-MM-DD');
+    const users  = readJsonSafe(PATHS.users, []);
+    const activos = users.filter(u => u.activo !== false).map(u => u.usuario);
+    if (!activos.length) return;
+
+    const placeholders = activos.map(() => '?').join(',');
+    db.all(
+      `SELECT usuario, tipo FROM registros WHERE fecha = ? AND usuario IN (${placeholders})`,
+      [hoy, ...activos],
+      async (err, rows) => {
+        if (err) { console.error('enviarCorreo query:', err.message); return; }
+
+        // Agrupar por usuario
+        const porUsuario = {};
+        rows.forEach(r => {
+          if (!porUsuario[r.usuario]) porUsuario[r.usuario] = [];
+          porUsuario[r.usuario].push(r.tipo);
+        });
+
+        // Detectar quién tiene entrada pero no salida
+        const incompletos = [];
+        activos.forEach(u => {
+          const tipos = porUsuario[u] || [];
+          const tieneEntrada = tipos.includes('entrada');
+          const tieneSalida  = tipos.includes('salida');
+          if (tieneEntrada && !tieneSalida) {
+            const userObj = users.find(x => x.usuario === u);
+            incompletos.push(userObj ? (userObj.nombre || u) : u);
+          }
+        });
+
+        if (!incompletos.length) {
+          console.log(`[Correo] ${hoy} — Sin dias incompletos. No se envio correo.`);
+          return;
+        }
+
+        // Construir correo
+        const fecha   = moment().tz('America/Chicago').format('MM/DD/YYYY');
+        const lista   = incompletos.map(n => `<li>${n}</li>`).join('');
+        const htmlBody = `
+          <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;">
+            <img src="https://dinex-clockin.onrender.com/logo-dinex.png"
+                 alt="DinEX" style="max-width:180px;margin-bottom:16px;">
+            <h2 style="color:#84ae05;">Alerta de Dias Incompletos</h2>
+            <p>Los siguientes empleados marcaron <strong>entrada</strong> hoy
+               <strong>${fecha}</strong> pero <strong>no registraron salida</strong>:</p>
+            <ul style="font-size:15px;line-height:1.8;">${lista}</ul>
+            <p style="color:#888;font-size:12px;margin-top:24px;">
+              Este correo fue generado automaticamente por DinEX WebClock a las 9:00 PM.
+            </p>
+          </div>
+        `;
+
+        try {
+          await mailTransporter.sendMail({
+            from:    '"DinEX WebClock" <dinexwebclock@dinexenvios.com>',
+            to:      'ffernandez@dinexenvios.com, mmarfil@dinexenvios.com',
+            subject: `[DinEX] ${incompletos.length} empleado(s) sin salida — ${fecha}`,
+            html:    htmlBody
+          });
+          console.log(`[Correo] Enviado — ${incompletos.length} dias incompletos el ${hoy}`);
+        } catch (mailErr) {
+          console.error('[Correo] Error enviando:', mailErr.message);
+        }
+      }
+    );
+  } catch (e) {
+    console.error('[Correo] Error general:', e.message);
+  }
+}
+
+// ==== Cron: enviar correo diario a las 9:00 PM hora de Chicago ====
+cron.schedule('0 21 * * *', enviarCorreoDiasIncompletos, { timezone: 'America/Chicago' });
+
+
+
 // ==== [FIX A-4] Cabeceras de seguridad HTTP ====
 app.use((req, res, next) => {
   res.setHeader('X-Content-Type-Options', 'nosniff');
@@ -177,16 +293,16 @@ app.get('/api/ping', (req, res) => res.json({ ok: true, time: new Date().toISOSt
 
 // ====== Geocerca ======
 const OFFICES = [
-  { id: 'TX-116',  name: 'Sede 1 - Quickstop',  lat: 29.71694, lng: -95.48804, radiusMeters: 600 },
-  { id: 'TX-117',  name: 'Sede 2 - Rosemberg',  lat: 29.57039, lng: -95.77575, radiusMeters: 600 },
-  { id: 'TX-1293', name: 'Sede 3 - South West', lat: 29.70031, lng: -95.28904, radiusMeters: 600 },
-  { id: 'TX-1386', name: 'Sede 4 - LongPoint',  lat: 29.79806, lng: -95.52474, radiusMeters: 600 },
-  { id: 'TX-1615', name: 'Sede 5 - Rampart',    lat: 29.71948, lng: -95.48853, radiusMeters: 600 },
-  { id: 'TX-839',  name: 'Sede 6 - Rosemberg C',lat: 29.55853, lng: -95.80851, radiusMeters: 600 },
-  { id: 'TX-845',  name: 'Sede 7 - Airline',    lat: 29.89497, lng: -95.39804, radiusMeters: 600 },
-  { id: 'TX-1544', name: 'Sede 8 - Fry',        lat: 29.79521, lng: -95.71863, radiusMeters: 600 },
-  { id: 'TX-104',  name: 'Sede 9 - Fulton',     lat: 29.83249, lng: -95.37564, radiusMeters: 600 },
-  { id: 'TX-101',  name: 'Sede 10 - Office',    lat: 29.74978, lng: -95.48319, radiusMeters: 600 },
+  { id: 'TX-116',  name: 'Sede 1 - Quickstop',  lat: 29.71694, lng: -95.48804, radiusMeters: 150 },
+  { id: 'TX-117',  name: 'Sede 2 - Rosemberg',  lat: 29.57039, lng: -95.77575, radiusMeters: 150 },
+  { id: 'TX-1293', name: 'Sede 3 - South West', lat: 29.70031, lng: -95.28904, radiusMeters: 150 },
+  { id: 'TX-1386', name: 'Sede 4 - LongPoint',  lat: 29.79806, lng: -95.52474, radiusMeters: 150 },
+  { id: 'TX-1615', name: 'Sede 5 - Rampart',    lat: 29.71948, lng: -95.48853, radiusMeters: 150 },
+  { id: 'TX-839',  name: 'Sede 6 - Rosemberg C',lat: 29.55853, lng: -95.80851, radiusMeters: 150 },
+  { id: 'TX-845',  name: 'Sede 7 - Airline',    lat: 29.89497, lng: -95.39804, radiusMeters: 150 },
+  { id: 'TX-1544', name: 'Sede 8 - Fry',        lat: 29.79521, lng: -95.71863, radiusMeters: 150 },
+  { id: 'TX-104',  name: 'Sede 9 - Fulton',     lat: 29.83249, lng: -95.37564, radiusMeters: 150 },
+  { id: 'TX-101',  name: 'Sede 10 - Office',    lat: 29.74978, lng: -95.48319, radiusMeters: 150 },
 ];
 
 function distanceMeters(lat1, lon1, lat2, lon2) {
@@ -795,21 +911,32 @@ app.get('/api/reporte-todos', apiRateLimit, (req, res) => {
 app.delete('/api/borrar-marcaje', verificarAdmin, (req, res) => {
   try {
     const { usuario, index, recordId } = req.body || {};
+    let adminUser = 'admin';
+    try { const raw = req.headers['x-admin-auth']; if (raw) adminUser = JSON.parse(raw).username || 'admin'; } catch(_) {}
+
     if (recordId) {
-      db.run(`DELETE FROM registros WHERE id = ?`, [recordId], (err) => {
-        if (err) { console.error('borrar-marcaje by ID:', err.message); return res.json({ success: false }); }
-        res.json({ success: true });
+      db.get(`SELECT usuario, tipo, fecha, hora FROM registros WHERE id = ?`, [recordId], (errGet, original) => {
+        db.run(`DELETE FROM registros WHERE id = ?`, [recordId], (err) => {
+          if (err) { console.error('borrar-marcaje by ID:', err.message); return res.json({ success: false }); }
+          if (original) {
+            registrarCorreccion(adminUser, 'ELIMINAR', original.usuario,
+              `Registro eliminado: ${original.tipo} del ${original.fecha} a las ${original.hora}`);
+          }
+          res.json({ success: true });
+        });
       });
       return;
     }
     db.all(
-      `SELECT id FROM registros WHERE usuario = ? ORDER BY fecha ASC, hora ASC`,
+      `SELECT id, usuario, tipo, fecha, hora FROM registros WHERE usuario = ? ORDER BY fecha ASC, hora ASC`,
       [usuario],
       (err, rows) => {
         if (err || !rows[index]) return res.json({ success: false });
-        const id = rows[index].id;
-        db.run(`DELETE FROM registros WHERE id = ?`, [id], (err2) => {
+        const row = rows[index];
+        db.run(`DELETE FROM registros WHERE id = ?`, [row.id], (err2) => {
           if (err2) return res.json({ success: false });
+          registrarCorreccion(adminUser, 'ELIMINAR', usuario,
+            `Registro eliminado: ${row.tipo} del ${row.fecha} a las ${row.hora}`);
           res.json({ success: true });
         });
       }
@@ -954,15 +1081,26 @@ app.post('/api/corregir-hora', verificarAdmin, (req, res) => {
     const { usuario, index, recordId, tipo, fecha, hora } = req.body || {};
     if (!tipo || !fecha || !hora) return res.json({ success: false, mensaje: 'Faltan campos requeridos.' });
 
+    // Obtener admin desde el header para el historial
+    let adminUser = 'admin';
+    try { const raw = req.headers['x-admin-auth']; if (raw) adminUser = JSON.parse(raw).username || 'admin'; } catch(_) {}
+
     const doUpdate = (id) => {
-      db.run(
-        `UPDATE registros SET tipo = ?, fecha = ?, hora = ? WHERE id = ?`,
-        [tipo, fecha, hora, id],
-        (err) => {
-          if (err) { console.error('corregir-hora UPDATE:', err.message); return res.json({ success: false }); }
-          res.json({ success: true });
-        }
-      );
+      // Guardar datos originales antes de actualizar
+      db.get(`SELECT tipo, fecha, hora FROM registros WHERE id = ?`, [id], (errGet, original) => {
+        db.run(
+          `UPDATE registros SET tipo = ?, fecha = ?, hora = ? WHERE id = ?`,
+          [tipo, fecha, hora, id],
+          (err) => {
+            if (err) { console.error('corregir-hora UPDATE:', err.message); return res.json({ success: false }); }
+            const detalle = original
+              ? `Cambio: ${original.tipo} ${original.fecha} ${original.hora} → ${tipo} ${fecha} ${hora}`
+              : `Corregido a: ${tipo} ${fecha} ${hora}`;
+            registrarCorreccion(adminUser, 'CORRECCION', usuario, detalle);
+            res.json({ success: true });
+          }
+        );
+      });
     };
 
     if (recordId) { doUpdate(recordId); return; }
@@ -1015,6 +1153,10 @@ app.post('/api/agregar-marcaje', verificarAdmin, (req, res) => {
             const all = readJsonSafe(PATHS.marcajes, []);
             all.push({ usuario, departamento, tipo, fecha, hora, ip });
             writeJsonSafe(PATHS.marcajes, all);
+            // Registrar en historial
+            let adminUser = 'admin';
+            try { const raw = req.headers['x-admin-auth']; if (raw) adminUser = JSON.parse(raw).username || 'admin'; } catch(_) {}
+            registrarCorreccion(adminUser, 'AGREGAR', usuario, `Marcaje agregado manualmente: ${tipo} el ${fecha} a las ${hora}`);
             res.json({ success: true, mensaje: 'Registro agregado correctamente.' });
           }
         );
@@ -1108,6 +1250,28 @@ app.get('/api/resumen-estado-hoy', apiRateLimit, (req, res) => {
   } catch (e) {
     console.error('GET /api/resumen-estado-hoy error:', e);
     res.status(500).json({ error: 'internal_error' });
+  }
+});
+
+// ==== Historial de correcciones ====
+app.get('/api/historial-correcciones', verificarAdmin, (req, res) => {
+  try {
+    const desde = req.query.desde || null;
+    const hasta = req.query.hasta || null;
+    let query  = `SELECT * FROM historial_correcciones`;
+    const params = [];
+    const conditions = [];
+    if (desde) { conditions.push(`fecha_accion >= ?`); params.push(desde); }
+    if (hasta) { conditions.push(`fecha_accion <= ?`); params.push(hasta); }
+    if (conditions.length) query += ` WHERE ` + conditions.join(' AND ');
+    query += ` ORDER BY id DESC LIMIT 500`;
+    db.all(query, params, (err, rows) => {
+      if (err) { console.error('historial-correcciones:', err.message); return res.status(500).json([]); }
+      res.json(rows);
+    });
+  } catch (e) {
+    console.error('GET /api/historial-correcciones error:', e);
+    res.status(500).json([]);
   }
 });
 
