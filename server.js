@@ -177,16 +177,16 @@ app.get('/api/ping', (req, res) => res.json({ ok: true, time: new Date().toISOSt
 
 // ====== Geocerca ======
 const OFFICES = [
-  { id: 'TX-116',  name: 'Sede 1 - Quickstop',  lat: 29.71694, lng: -95.48804, radiusMeters: 150 },
-  { id: 'TX-117',  name: 'Sede 2 - Rosemberg',  lat: 29.57039, lng: -95.77575, radiusMeters: 150 },
-  { id: 'TX-1293', name: 'Sede 3 - South West', lat: 29.70031, lng: -95.28904, radiusMeters: 150 },
-  { id: 'TX-1386', name: 'Sede 4 - LongPoint',  lat: 29.79806, lng: -95.52474, radiusMeters: 150 },
-  { id: 'TX-1615', name: 'Sede 5 - Rampart',    lat: 29.71948, lng: -95.48853, radiusMeters: 150 },
-  { id: 'TX-839',  name: 'Sede 6 - Rosemberg C',lat: 29.55853, lng: -95.80851, radiusMeters: 150 },
-  { id: 'TX-845',  name: 'Sede 7 - Airline',    lat: 29.89497, lng: -95.39804, radiusMeters: 150 },
-  { id: 'TX-1544', name: 'Sede 8 - Fry',        lat: 29.79521, lng: -95.71863, radiusMeters: 150 },
-  { id: 'TX-104',  name: 'Sede 9 - Fulton',     lat: 29.83249, lng: -95.37564, radiusMeters: 150 },
-  { id: 'TX-101',  name: 'Sede 10 - Office',    lat: 29.74978, lng: -95.48319, radiusMeters: 150 },
+  { id: 'TX-116',  name: 'Sede 1 - Quickstop',  lat: 29.71694, lng: -95.48804, radiusMeters: 600 },
+  { id: 'TX-117',  name: 'Sede 2 - Rosemberg',  lat: 29.57039, lng: -95.77575, radiusMeters: 600 },
+  { id: 'TX-1293', name: 'Sede 3 - South West', lat: 29.70031, lng: -95.28904, radiusMeters: 600 },
+  { id: 'TX-1386', name: 'Sede 4 - LongPoint',  lat: 29.79806, lng: -95.52474, radiusMeters: 600 },
+  { id: 'TX-1615', name: 'Sede 5 - Rampart',    lat: 29.71948, lng: -95.48853, radiusMeters: 600 },
+  { id: 'TX-839',  name: 'Sede 6 - Rosemberg C',lat: 29.55853, lng: -95.80851, radiusMeters: 600 },
+  { id: 'TX-845',  name: 'Sede 7 - Airline',    lat: 29.89497, lng: -95.39804, radiusMeters: 600 },
+  { id: 'TX-1544', name: 'Sede 8 - Fry',        lat: 29.79521, lng: -95.71863, radiusMeters: 600 },
+  { id: 'TX-104',  name: 'Sede 9 - Fulton',     lat: 29.83249, lng: -95.37564, radiusMeters: 600 },
+  { id: 'TX-101',  name: 'Sede 10 - Office',    lat: 29.74978, lng: -95.48319, radiusMeters: 600 },
 ];
 
 function distanceMeters(lat1, lon1, lat2, lon2) {
