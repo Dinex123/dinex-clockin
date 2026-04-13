@@ -605,26 +605,17 @@
       const hasta = document.getElementById('fechaHasta').value;
 
       const rows = resumenGlobal.map(e => ({
-        'Nombre':           e.nombre,
-        'Usuario':          e.usuario,
-        'Departamento':     e.departamento || '—',
-        'Dias Trabajados':  e.diasTrabajados,
-        'Total Horas':      e.totalHorasStr,
-        'Dias Sin Salida':  e.diasSinSalida,
-        'Salidas Auto':     e.salidasAuto,
-        'Tardanzas':        e.tardanzas,
-        'Dias Fuera Geo':   e.diasFueraGeo,
-        'Estado':           e.semaforo === 'rojo' ? 'Con errores'
-                          : e.semaforo === 'amarillo' ? 'Con advertencias'
-                          : 'Sin errores'
+        'Nombre':                    e.nombre,
+        'Departamento':              e.departamento || '—',
+        'Dias Trabajados':           e.diasTrabajados,
+        'Total Horas Trabajadas':    e.totalHorasStr
       }));
 
       const ws = XLSX.utils.json_to_sheet(rows);
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, 'Resumen');
       ws['!cols'] = [
-        {wpx:160},{wpx:100},{wpx:120},{wpx:100},{wpx:90},
-        {wpx:100},{wpx:90},{wpx:80},{wpx:100},{wpx:110}
+        {wpx:200},{wpx:140},{wpx:120},{wpx:150}
       ];
       const periodo = desde && hasta ? `_${desde}_al_${hasta}` : '';
       XLSX.writeFile(wb, `resumen-empleados${periodo}.xlsx`);
@@ -640,7 +631,7 @@
       const hasta = document.getElementById('fechaHasta').value;
 
       const { jsPDF } = window.jspdf;
-      const doc = new jsPDF({ orientation: 'landscape' });
+      const doc = new jsPDF({ orientation: 'portrait' });
       const img = new Image();
       img.src = 'logo-dinex.png';
       img.onload = () => {
@@ -654,28 +645,16 @@
           e.nombre,
           e.departamento || '—',
           String(e.diasTrabajados),
-          e.totalHorasStr,
-          e.diasSinSalida > 0 ? `${e.diasSinSalida} sin salida` : '',
-          e.salidasAuto   > 0 ? `${e.salidasAuto} auto` : '',
-          e.tardanzas     > 0 ? `${e.tardanzas} tard.` : '',
-          e.semaforo === 'rojo' ? 'Con errores'
-            : e.semaforo === 'amarillo' ? 'Advertencias' : 'OK'
+          e.totalHorasStr
         ]);
 
         doc.autoTable({
           startY: 24,
-          head: [['Nombre','Departamento','Dias','Total Horas','Sin Salida','Sal. Auto','Tardanzas','Estado']],
+          head: [['Nombre', 'Departamento', 'Dias Trabajados', 'Total Horas Trabajadas']],
           body: filas,
-          styles: { fontSize: 8, halign: 'center' },
+          styles: { fontSize: 10, halign: 'center' },
           headStyles: { fillColor: [236, 0, 140], textColor: 255 },
-          columnStyles: { 0: { halign: 'left' } },
-          didParseCell: (data) => {
-            if (data.section === 'body') {
-              const estado = data.row.raw[7];
-              if (estado === 'Con errores')   data.cell.styles.fillColor = [255, 240, 240];
-              else if (estado === 'Advertencias') data.cell.styles.fillColor = [255, 252, 235];
-            }
-          }
+          columnStyles: { 0: { halign: 'left' }, 1: { halign: 'left' } }
         });
 
         const periodo = desde && hasta ? `_${desde}_al_${hasta}` : '';
