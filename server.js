@@ -303,6 +303,8 @@ const OFFICES = [
   { id: 'TX-1544', name: 'Sede 8 - Fry',        lat: 29.79521, lng: -95.71863, radiusMeters: 150 },
   { id: 'TX-104',  name: 'Sede 9 - Fulton',     lat: 29.83249, lng: -95.37564, radiusMeters: 150 },
   { id: 'TX-101',  name: 'Sede 10 - Office',    lat: 29.74978, lng: -95.48319, radiusMeters: 150 },
+  { id: 'TX-1829', name: 'Sede 11 - Env y Mas 6',lat: 32.710180, lng: -96.997196, radiusMeters: 150 },
+  { id: 'TX-1830', name: 'Sede 12 - Env y Mas 7',lat: 32.834862, lng: -96.976048, radiusMeters: 150 },
 ];
 
 function distanceMeters(lat1, lon1, lat2, lon2) {
