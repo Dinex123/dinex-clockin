@@ -305,6 +305,10 @@ const OFFICES = [
   { id: 'TX-101',  name: 'Sede 10 - Office',    lat: 29.74978, lng: -95.48319, radiusMeters: 150 },
   { id: 'TX-1829', name: 'Sede 11 - Env y Mas 6',lat: 32.710180, lng: -96.997196, radiusMeters: 150 },
   { id: 'TX-1830', name: 'Sede 12 - Env y Mas 7',lat: 32.834862, lng: -96.976048, radiusMeters: 150 },
+  { id: 'TX-1832', name: 'Sede 13 - Envimas 1', lat: 32.564196, lng: -97.134833, radiusMeters: 150},
+  { id: 'TX-1833', name: 'Sede 14 - Envimas 2', lat: 32.719678, lng: -96.893853, radiusMeters: 150},
+  { id: 'TX-1834', name: 'Sede 15 - Envimas 3', lat: 32.719933, lng: -97.006318, radiusMeters: 150},
+  { id: 'TX-1835', name: 'Sede 16 - Envimas 4', lat: 32.955287, lng: -96.888237, radiusMeters: 150 },
 ];
 
 function distanceMeters(lat1, lon1, lat2, lon2) {
