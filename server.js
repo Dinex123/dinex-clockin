@@ -138,7 +138,7 @@ db.serialize(() => {
 });
 
 // ==== [FIX A-3] bodyParser con límite de 100kb para prevenir DoS ====
-app.use(bodyParser.json({ limit: '100kb' }));
+app.use(bodyParser.json({ limit: '5mb' }));
 
 // ==== Tabla de historial de correcciones ====
 db.run(`CREATE TABLE IF NOT EXISTS historial_correcciones (
