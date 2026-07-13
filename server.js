@@ -1437,31 +1437,34 @@ app.post('/api/normalizar-preview', verificarAdmin, (req, res) => {
   }
 });
 
-// Endpoint de APLICAR — guarda los cambios confirmados
+// Endpoint de APLICAR — guarda los cambios confirmados usando transacción SQLite
 app.post('/api/normalizar-aplicar', verificarAdmin, (req, res) => {
   try {
     const { cambios } = req.body || {};
     if (!cambios || !cambios.length) return res.json({ success: false, mensaje: 'No hay cambios.' });
 
     let completados = 0;
-    let errores = 0;
+    let errores     = 0;
 
-    const aplicarSiguiente = (i) => {
-      if (i >= cambios.length) {
-        return res.json({ success: true, completados, errores });
-      }
-      const c = cambios[i];
-      db.run(
-        `UPDATE registros SET hora = ? WHERE id = ?`,
-        [c.horaCorregida, c.id],
-        (err) => {
+    db.serialize(() => {
+      db.run('BEGIN TRANSACTION');
+      const stmt = db.prepare('UPDATE registros SET hora = ? WHERE id = ?');
+      cambios.forEach(c => {
+        stmt.run([c.horaCorregida, c.id], (err) => {
           if (err) { errores++; console.error('normalizar-aplicar:', err.message); }
           else completados++;
-          aplicarSiguiente(i + 1);
+        });
+      });
+      stmt.finalize();
+      db.run('COMMIT', (err) => {
+        if (err) {
+          console.error('normalizar-aplicar COMMIT error:', err.message);
+          db.run('ROLLBACK');
+          return res.status(500).json({ success: false, mensaje: 'Error al guardar cambios.' });
         }
-      );
-    };
-    aplicarSiguiente(0);
+        res.json({ success: true, completados: cambios.length - errores, errores });
+      });
+    });
   } catch (e) {
     console.error('POST /api/normalizar-aplicar error:', e);
     res.status(500).json({ success: false, mensaje: 'Error interno.' });
