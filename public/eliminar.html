@@ -139,7 +139,7 @@
             <td>
               <div class="acciones">
                 <button class="btn-accion btn-activar"
-                  ${activo || eliminado ? 'disabled' : ''}
+                  ${activo && !eliminado ? 'disabled' : ''}
                   onclick="accion('activar','${u.usuario}')">✅ Activar</button>
                 <button class="btn-accion btn-desactivar"
                   ${!activo || eliminado ? 'disabled' : ''}
